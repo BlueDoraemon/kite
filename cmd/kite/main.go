@@ -60,10 +60,11 @@ func run(args []string) error {
 	}
 
 	err = kite.Run(ctx, provider, kite.RunOptions{
-		Session: session,
-		Tools:   toolSet.All(),
-		Stdout:  os.Stdout,
-		Print:   true,
+		Session:  session,
+		Tools:    toolSet.All(),
+		Stdout:   os.Stdout,
+		Print:    true,
+		MaxTurns: 50,
 	})
 	if err != nil {
 		return err
