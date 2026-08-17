@@ -1,4 +1,1 @@
-# kite
-# kite
-# kite
-# kite
+# Kite A minimal, embeddable agent runtime for Go. Kite provides a small set of building blocks for running agents reliably: - sessions - model providers - tools - structured events - artifacts - context management - policy - execution It is designed to work on its own or underneath supervisors and orchestrators. > Small core. Open interfaces. Easy to compose. ## Why Kite? Agent runtimes tend to grow quickly. Kite takes the opposite approach. The core handles the parts most agents need: ```text Prompt ↓ Session ↓ Context ↓ Provider ↓ Tool calls ↓ Results
