@@ -1,4 +1,4 @@
-// Command go-session demonstrates the Kite Go API: create a session,,
+// Command go-session demonstrates the Kite Go API: create a session,
 // drive a prompt, and read the resulting events.
 //
 // Usage:

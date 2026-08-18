@@ -1,6 +1,6 @@
 // Command schemagen regenerates the versioned JSON schemas under
-// docs/schemas/v1 from the runtime wire types. It fails if the committed
-// schemas differ from what the generator produces.
+// docs/schemas/v1. It fails if the committed schemas differ from what the
+// generator produces.
 package main
 
 import (

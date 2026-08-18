@@ -241,7 +241,7 @@ type UsagePayload struct {
 	Usage Usage `json:"usage"`
 }
 
-// ResumePayload is emitted when a session is resumed.
+// ResumePayload is the payload shape reserved for resume events.
 type ResumePayload struct {
 	Prompt string `json:"prompt"`
 }
@@ -292,9 +292,11 @@ type Config struct {
 	// MaxPreview is the maximum bytes of an artifact preview. Zero means
 	// 8 KiB.
 	MaxPreview int
-	// Stdout receives human-readable progress when Print is true.
+	// Stdout is reserved for human-readable progress output. Session output is
+	// currently delivered through events instead.
 	Stdout io.Writer
-	// Print mirrors model text and tool output to Stdout as it happens.
+	// Print is reserved for requesting progress mirroring by frontends. The
+	// core runtime currently leaves presentation to event consumers.
 	Print bool
 	// MaxTurns caps the number of agent turns. Zero means no limit.
 	MaxTurns int

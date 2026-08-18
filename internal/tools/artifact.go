@@ -38,9 +38,8 @@ func (s *Set) Artifact() *Tool {
 	}
 }
 
-// readArtifact reads an artifact from the data directory. The artifact ID
-// encodes the session prefix (art_<session>_<id>), so no session argument is
-// needed.
+// readArtifact reads an artifact from the data directory. Artifact IDs are
+// globally unique, so the store can find one without a session argument.
 func (s *Set) readArtifact(id string, offset, limit int64) ([]byte, error) {
 	store, ok := s.Store.(interface {
 		LoadArtifactByID(string, int64, int64) ([]byte, error)

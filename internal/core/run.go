@@ -32,7 +32,7 @@ func (s *Session) run(ctx context.Context, text string, ch chan<- Event) {
 	var usage Usage
 	changed := map[string]bool{}
 
-	// Record the worktree state at session start so changed files can be
+	// Record the worktree state at prompt start so changed files can be
 	// determined relative to it.
 	baseline := snapshotWorktree(s.cfg.WorkingDir)
 

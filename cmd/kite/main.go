@@ -79,8 +79,9 @@ Exit codes: 0 completed, 1 runtime/verification failure, 2 usage/config error
 `)
 }
 
-// providerConfig resolves the provider configuration with precedence:
-// explicit flags -> Kite environment -> Crush import -> defaults.
+// providerConfig resolves explicit flags and the API key environment setting,
+// optionally importing remaining values from Crush. With Crush import active,
+// only the API key environment variable overrides an imported value.
 func providerConfig(baseURL, model *string, fromCrush bool) (*openai.Provider, error) {
 	apiKey := os.Getenv("KITE_API_KEY")
 	if fromCrush {

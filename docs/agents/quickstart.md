@@ -51,7 +51,8 @@ The structured result contains:
 
 - `status` — `completed` or `failed`
 - `text` — the final assistant text
-- `changed_files` — files modified during the run (relative to session start)
+- `changed_files` — files modified during the current prompt
+- `changed_files_complete` — whether worktree inspection found the complete set
 - `verification` — the last verification command, status, exit code, and
   artifacts
 - `usage` — aggregated token usage

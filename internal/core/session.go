@@ -231,7 +231,8 @@ func (s *Session) BuildContext() []Message {
 	return buildContext(s)
 }
 
-// DataDir returns the data directory the session persists to.
+// DataDir returns the configured data directory. An empty result means the
+// session uses the platform default.
 func (s *Session) DataDir() string { return s.cfg.DataDir }
 
 // Store returns the session store, for advanced consumers.

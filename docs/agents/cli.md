@@ -11,8 +11,8 @@
 | `kite rpc` | Serve the NDJSON RPC protocol on stdin/stdout |
 | `kite status [session-id]` | Show session status |
 | `kite inspect <tool-id>` | Show a tool's schema |
-| `kite artifact <artifact-id> [--offset N --limit N]` | Retrieve an artifact |
-| `kite context [session-id] [--full]` | Show the session context |
+| `kite artifact [--offset N --limit N] <artifact-id>` | Retrieve an artifact |
+| `kite context [--full] [session-id]` | Show the session context |
 
 ## Flags
 
@@ -26,6 +26,9 @@
 | `-limit N` | artifact | Maximum bytes to read |
 | `-full` | context | Show full context including repository instructions |
 
+Flags must precede positional arguments. For example, use
+`kite artifact --offset 32768 art_...` and `kite context --full sess_...`.
+
 ## Environment variables
 
 | Variable | Default | Purpose |
@@ -35,8 +38,7 @@
 | `KITE_MODEL` | `gpt-4o-mini` | Model identifier |
 | `KITE_DATA_DIR` | XDG/LOCALAPPDATA | Where sessions and artifacts are stored |
 
-Precedence: explicit flags → Kite environment variables → `--from-crush`
-import → defaults.
+Configuration precedence is documented in [Providers](providers.md).
 
 ## Exit codes
 

@@ -39,14 +39,18 @@ repository working directory only.
 
 - Artifacts may contain repository content; they are stored with user-only
   permissions.
-- Events and errors never include artifact contents.
+- Artifact previews are persisted in `artifact.created` and `tool.finished`
+  events; full artifact contents are not included in events or errors.
+- Session event logs can therefore contain bounded repository-content
+  previews and should be treated as sensitive.
 - The data directory defaults to user-only XDG/LOCALAPPDATA storage.
 
 ## Redaction guarantees
 
 - No API keys, OAuth tokens, or credentials in any event, error, log, or RPC
   response.
-- No full request bodies in errors (bounded, truncated bodies only).
+- Provider HTTP errors include at most 500 bytes of the response body; request
+  bodies are not included.
 
 ## See also
 

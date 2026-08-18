@@ -18,6 +18,9 @@ bounds each record. The server processes requests sequentially.
 | `artifact` | `{"artifact_id": "...", "offset": 0, "limit": 32768}` | artifact content |
 | `context` | `{"session_id": "...", "full": false}` | context messages |
 
+RPC always returns the complete context. The optional `full` field is accepted
+for parity with the CLI contract but does not alter the RPC result in v1.
+
 ## Request
 
 ```json

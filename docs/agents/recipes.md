@@ -23,8 +23,8 @@ last complete durable turn.
 
 ```sh
 kite run "list every file in this repository"           # output stored as an artifact
-kite artifact art_... --offset 0 --limit 32768          # page through it
-kite artifact art_... --offset 32768 --limit 32768      # next page
+kite artifact --offset 0 --limit 32768 art_...          # page through it
+kite artifact --offset 32768 --limit 32768 art_...      # next page
 ```
 
 ## Orchestrate through RPC
@@ -40,7 +40,7 @@ printf '%s\n' \
 
 ```sh
 kite context                 # what a fresh session in this directory will see
-kite context sess_... --full # full context including repository instructions
+kite context --full sess_... # full context including repository instructions
 ```
 
 ## Use --from-crush
@@ -50,5 +50,4 @@ kite run --from-crush "explain this repository"
 ```
 
 Reuses the Crush-selected large model, credential, and endpoint without
-executing crushrc. Precedence: explicit flags → Kite environment → Crush
-import → defaults.
+executing crushrc. See [Providers](providers.md) for configuration precedence.

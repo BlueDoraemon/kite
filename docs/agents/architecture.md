@@ -44,14 +44,14 @@ size, media type, and truncation metadata.
 
 ## Events
 
-Every event is durable, sequence-numbered, and persisted before published.
+Every event is durable, sequence-numbered, and persisted before publication.
 Consumers receive them on the `Prompt` channel and can replay a session from
 its JSONL log.
 
 ## Result
 
 When a prompt completes, Kite builds a structured `Result`: status, final
-text, changed files (relative to session start), verification, and usage.
+text, files changed during that prompt, verification, and usage.
 
 ## See also
 
