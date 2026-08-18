@@ -24,7 +24,8 @@ mid-write cannot corrupt the log.
 A cross-platform per-session lease with a heartbeat prevents concurrent
 writers. Acquiring a lease for a session that is already leased fails. A
 stale lease (from a crashed process) is recovered automatically after the TTL
-expires.
+expires. Lease heartbeats, event appends, and release validate an ownership
+token, so a superseded writer cannot modify or release the current lease.
 
 ## Replay
 

@@ -12,7 +12,8 @@ Kite is designed with a small, explicit security model.
 
 ## Repository trust
 
-- `AGENTS.md` is loaded from the nearest repository root, capped at 64 KiB.
+- The nearest `AGENTS.md` between the working directory and repository root is
+  loaded, capped at 64 KiB.
 - The absolute source path is recorded so instructions are auditable.
 
 ## Prompt injection

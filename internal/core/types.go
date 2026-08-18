@@ -121,7 +121,7 @@ type Result struct {
 	Status string `json:"status"`
 	// Text is the final assistant text.
 	Text string `json:"text,omitempty"`
-	// ChangedFiles lists files modified during the run.
+	// ChangedFiles lists files modified during the current prompt.
 	ChangedFiles []string `json:"changed_files,omitempty"`
 	// ChangedFilesComplete is false outside a Git repository, where the
 	// changed-files list may be incomplete.
