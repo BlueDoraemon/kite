@@ -1,1 +1,1 @@
-no_ci: true
+# CI is provided by .github/workflows/ci.yml.
