@@ -143,7 +143,7 @@ Three role-identical palettes change atmosphere without changing meaning or ledg
 
 The interface is one width-bounded stream. It defaults to 88 columns, respects `COLUMNS`, clamps to 48–120 columns, and truncates long single-line values with an ellipsis. The header establishes identity, session, model, theme, repository context, a full-width rule, and compact command help; the event ledger follows in durable sequence.
 
-Every event row begins with a four-digit sequence number and one trailing cell. Tool previews sit under their start or finish row with a five-cell indent and a `|` gutter. Input previews show at most three lines and output previews at most four; longer content ends with an explicit inspection instruction. Section labels such as `PROMPT`, `RESULT`, and `CONTEXT` are embedded in full-width hyphen rules. The composer returns after the latest event as one blank row followed by the bold `> Ask Kite` cue.
+Durable state rows begin with a four-digit sequence number and one trailing cell; streaming assistant text instead stays grouped beneath its `KITE |` actor label. Tool previews sit under their start or finish row with a five-cell indent and a `|` gutter. Input previews show at most three lines and output previews at most four; longer content ends with an explicit inspection instruction. Section labels such as `PROMPT`, `RESULT`, and `CONTEXT` are embedded in full-width hyphen rules. The composer returns after the latest event as one blank row followed by the bold `> Ask Kite` cue.
 
 **The Ledger Order Rule.** Never split durable events into cards, tabs, or competing columns. Sequence and proximity carry the operational story.
 
@@ -167,7 +167,7 @@ A compact opening block identifies `KITE`, session, model, theme, and optional r
 
 ### Event Ledger Row
 
-Each durable row uses a zero-padded four-digit sequence gutter, then a literal state or actor marker and concise content. Assistant streaming text aligns under a five-cell indent with the bold `KITE |` actor label. Unknown events remain visible as muted `[event]` rows rather than disappearing.
+Each durable state row uses a zero-padded four-digit sequence gutter, then a literal state or actor marker and concise content. Assistant streaming text aligns under a five-cell indent with the bold `KITE |` actor label. Unknown events remain visible as muted `[event]` rows rather than disappearing.
 
 ### Tool Hunk
 
@@ -175,7 +175,7 @@ A tool begins with the accent `+ TOOL` marker and its name. Up to three input li
 
 ### Result Seal
 
-The `RESULT` rule closes a run into a compact summary: explicit completion state, changed files, verification status including staleness, and total token usage. Passed verification is `[ok]`; stale verification remains textually `[stale]` even when warning color is unavailable.
+The `RESULT` rule closes a run into a compact summary: explicit completion state, changed files, verification status including staleness, and total token usage. Separate verification ledger rows use `[ok]`, `[fail]`, or `[stale]`, so their state remains explicit when color is unavailable.
 
 ### Composer
 

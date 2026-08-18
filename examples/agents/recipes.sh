@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
-# recipes.sh demonstrates the kite CLI workflows: run, resume, artifact, and
-# context. Set KITE_API_KEY (or use --from-crush) before running.
+# recipes.sh demonstrates the kite CLI workflows: run, TUI, resume, artifact,
+# context, and RPC. Set KITE_API_KEY (or use --from-crush) before running.
 set -e
 
 echo "== run =="
