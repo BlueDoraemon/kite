@@ -188,3 +188,43 @@ func TestPrintMirrorsText(t *testing.T) {
 		t.Fatalf("stdout = %q, want %q", buf.String(), "hello\n")
 	}
 }
+
+func TestRunFinishWithToolCallsStops(t *testing.T) {
+	// A provider that signals finish and also returns tool calls must stop
+	// immediately, not run the tools.
+	p := &fakeProvider{replies: []Reply{
+		{Text: "done", Finish: true, ToolCalls: []ToolCall{{ID: "call1", Name: "echo", Input: `{"x":1}`}}},
+	}}
+	var events []Event
+	err := Run(context.Background(), p, RunOptions{
+		Session: &Session{Model: "m", Messages: []Message{{Role: RoleUser, Content: "hi"}}},
+		Tools:   []Tool{echoTool{}},
+		OnEvent: func(e Event) error { events = append(events, e); return nil },
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Only one provider call, and no tool events.
+	if len(p.gotSess) != 1 {
+		t.Fatalf("provider called %d times, want 1", len(p.gotSess))
+	}
+	for _, e := range events {
+		if e.Type == "tool_call" || e.Type == "tool_result" {
+			t.Fatalf("tool events emitted despite finish: %+v", events)
+		}
+	}
+}
+
+func TestJSONInputStringTypeError(t *testing.T) {
+	m, err := ParseInput(`{"path":123}`)
+	if err != nil {
+		t.Fatalf("parse failed: %v", err)
+	}
+	if _, err := m.String("path", "def"); err == nil {
+		t.Fatal("expected error for non-string argument")
+	}
+	// Absent keys fall back to the default without error.
+	if v, err := m.String("missing", "def"); err != nil || v != "def" {
+		t.Fatalf("String(missing) = %q, %v; want def, nil", v, err)
+	}
+}

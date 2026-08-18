@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -49,10 +50,36 @@ func (s *Set) Edit() *Tool {
 			} else {
 				replaced = strings.Replace(content, oldText, newText, 1)
 			}
-			if err := os.WriteFile(abs, []byte(replaced), st.Mode()); err != nil {
+			if err := writeFileAtomic(abs, []byte(replaced), st.Mode()); err != nil {
 				return "", err
 			}
 			return fmt.Sprintf("Replaced %d occurrence(s) in %s.", count, path), nil
 		},
 	}
+}
+
+// writeFileAtomic replaces a file by writing a temp file in the same
+// directory and renaming it over the target, so a crash or interruption
+// never leaves a truncated file behind.
+func writeFileAtomic(path string, data []byte, mode os.FileMode) error {
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, ".kite-edit-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName) // no-op after a successful rename
+
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(mode); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, path)
 }

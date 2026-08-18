@@ -80,7 +80,7 @@ func run(args []string) error {
 }
 
 func gitDiff(dir string) string {
-	cmd := exec.Command("git", "diff")
+	cmd := exec.Command("git", "diff", "--no-color")
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
 	if err != nil {

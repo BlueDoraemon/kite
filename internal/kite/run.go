@@ -55,15 +55,17 @@ func Run(ctx context.Context, provider Provider, opts RunOptions) error {
 			}
 		}
 
-		if len(reply.ToolCalls) == 0 {
-			if reply.Finish {
-				if err := emit(Event{Type: "finish", Text: reply.FinishText}); err != nil {
-					return err
-				}
-				if opts.Print && reply.FinishText != "" {
-					fmt.Fprintln(opts.Stdout, reply.FinishText)
-				}
+		if reply.Finish {
+			if err := emit(Event{Type: "finish", Text: reply.FinishText}); err != nil {
+				return err
 			}
+			if opts.Print && reply.FinishText != "" {
+				fmt.Fprintln(opts.Stdout, reply.FinishText)
+			}
+			return nil
+		}
+
+		if len(reply.ToolCalls) == 0 {
 			return nil
 		}
 
@@ -124,13 +126,16 @@ func ParseInput(input string) (JSONInput, error) {
 	return m, nil
 }
 
-// String returns the string value of an argument, or def if absent.
-func (m JSONInput) String(key, def string) string {
-	if raw, ok := m[key]; ok {
-		var s string
-		if err := json.Unmarshal(raw, &s); err == nil {
-			return s
-		}
+// String returns the string value of an argument. It reports an error if the
+// argument is present but is not a JSON string, and returns def if absent.
+func (m JSONInput) String(key, def string) (string, error) {
+	raw, ok := m[key]
+	if !ok {
+		return def, nil
 	}
-	return def
+	var s string
+	if err := json.Unmarshal(raw, &s); err != nil {
+		return "", fmt.Errorf("argument %q must be a string", key)
+	}
+	return s, nil
 }

@@ -5,8 +5,13 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"syscall"
 	"time"
 )
+
+// BashTimeout is how long a command may run before it is killed, along with
+// any processes it started.
+const BashTimeout = 30 * time.Second
 
 // maxBashOutput caps how much of a command's output is returned to the model.
 const maxBashOutput = 32 * 1024
@@ -23,10 +28,17 @@ func (s *Set) Bash() *Tool {
 			command := str(args, "command")
 			cmd := exec.CommandContext(ctx, "sh", "-c", command)
 			cmd.Dir = s.Dir
+			// Put the command in its own process group so the timeout can
+			// kill the whole tree, not just the shell.
+			cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 			// The tool's own timeout bounds runaway commands even when
 			// the caller's context has no deadline.
-			timer := time.AfterFunc(30*time.Second, func() {
-				cmd.Process.Kill()
+			timer := time.AfterFunc(BashTimeout, func() {
+				// Kill the group (negative pid) so children die too.
+				// The process may not have started yet; guard for that.
+				if cmd.Process != nil {
+					syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+				}
 			})
 			defer timer.Stop()
 			out, err := cmd.CombinedOutput()

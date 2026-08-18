@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/BlueDoraemon/kite/internal/kite"
 )
@@ -111,5 +112,71 @@ func TestCompleteNoChoicesErrors(t *testing.T) {
 	_, err := p.Complete(context.Background(), &kite.Session{Model: "m"}, nil)
 	if err == nil {
 		t.Fatal("expected error for empty choices")
+	}
+}
+
+func TestCompleteRetriesOn503(t *testing.T) {
+	var calls int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if calls < 3 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte(`{"error":"busy"}`))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"ok"}}]}`))
+	}))
+	defer srv.Close()
+
+	p := New(srv.URL, "", "m")
+	p.MaxRetries = 3
+	reply, err := p.Complete(context.Background(), &kite.Session{Model: "m"}, nil)
+	if err != nil {
+		t.Fatalf("complete failed after retries: %v", err)
+	}
+	if reply.Text != "ok" {
+		t.Fatalf("reply text = %q, want ok", reply.Text)
+	}
+	if calls != 3 {
+		t.Fatalf("server called %d times, want 3", calls)
+	}
+}
+
+func TestCompleteNoRetryOn400(t *testing.T) {
+	var calls int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{"error":"bad"}`))
+	}))
+	defer srv.Close()
+
+	p := New(srv.URL, "", "m")
+	p.MaxRetries = 3
+	_, err := p.Complete(context.Background(), &kite.Session{Model: "m"}, nil)
+	if err == nil || !strings.Contains(err.Error(), "400") {
+		t.Fatalf("expected 400 error, got %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("server called %d times, want 1 (no retry on 400)", calls)
+	}
+}
+
+func TestTruncateKeepsUTF8Intact(t *testing.T) {
+	// A multibyte rune straddling the cut point must not be split.
+	s := "héllo wörld"
+	out := truncate(s, 6)
+	if !utf8.ValidString(out) {
+		t.Fatalf("truncate produced invalid UTF-8: %q", out)
+	}
+	if !strings.HasSuffix(out, "...") {
+		t.Fatalf("truncate output = %q, want ellipsis suffix", out)
+	}
+	if len(out) > 9 { // 6 bytes + "..."
+		t.Fatalf("truncate output too long: %q (%d bytes)", out, len(out))
+	}
+	if truncate("short", 100) != "short" {
+		t.Fatal("truncate should return short strings unchanged")
 	}
 }
