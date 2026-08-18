@@ -54,6 +54,9 @@ func Load() (*Imported, error) {
 		return nil, err
 	}
 
+	if sel.Models.Large == nil {
+		return nil, fmt.Errorf("crush: no large model selected")
+	}
 	imp := &Imported{Model: sel.Models.Large.Model}
 	if imp.Model == "" {
 		return nil, fmt.Errorf("crush: no large model selected")

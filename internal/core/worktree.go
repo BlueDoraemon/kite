@@ -1,77 +1,110 @@
 package core
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 )
 
-// snapshotWorktree records the current worktree state so changes can be
-// determined relative to it. It returns the set of paths that are already
-// modified or untracked at session start.
-func snapshotWorktree(dir string) map[string]bool {
+type worktreeSnapshot struct {
+	complete bool
+	paths    map[string]string
+}
+
+func snapshotWorktree(dir string) worktreeSnapshot {
+	snap := worktreeSnapshot{paths: map[string]string{}}
 	if dir == "" {
-		return map[string]bool{}
+		return snap
 	}
-	cmd := exec.Command("git", "status", "--porcelain", "-z")
+	cmd := exec.Command("git", "status", "--porcelain=v1", "-z", "--untracked-files=all")
 	cmd.Dir = dir
-	out, err := cmd.CombinedOutput()
+	out, err := cmd.Output()
 	if err != nil {
-		return map[string]bool{}
+		return snap
 	}
-	snap := map[string]bool{}
-	for _, entry := range strings.Split(string(out), "\x00") {
-		if entry == "" {
-			continue
-		}
-		// Format: XY path, or XY path -> path for renames.
-		fields := strings.SplitN(entry, " ", 2)
-		if len(fields) == 2 {
-			snap[fields[1]] = true
-		}
+	snap.complete = true
+	for path, status := range parsePorcelainZ(out) {
+		snap.paths[path] = status + ":" + pathFingerprint(dir, path)
 	}
 	return snap
 }
 
-// diffWorktree returns the files changed relative to the baseline snapshot
-// (including modifications to files that were already dirty), and whether the
-// list is complete (true inside a Git repository).
-func diffWorktree(dir string, baseline map[string]bool) ([]string, bool) {
-	if dir == "" {
-		return nil, false
-	}
-	cmd := exec.Command("git", "status", "--porcelain", "-z")
-	cmd.Dir = dir
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		// Not a Git repository: the list would be incomplete.
-		return nil, false
-	}
-	changed := map[string]bool{}
-	for _, entry := range strings.Split(string(out), "\x00") {
-		if entry == "" {
+func parsePorcelainZ(data []byte) map[string]string {
+	entries := strings.Split(string(data), "\x00")
+	out := make(map[string]string)
+	for i := 0; i < len(entries); i++ {
+		entry := entries[i]
+		if len(entry) < 4 || entry[2] != ' ' {
 			continue
 		}
-		fields := strings.SplitN(entry, " ", 2)
-		if len(fields) == 2 {
-			changed[fields[1]] = true
+		status := entry[:2]
+		path := entry[3:]
+		if status[0] == 'R' || status[0] == 'C' || status[1] == 'R' || status[1] == 'C' {
+			i++
 		}
+		out[path] = status
 	}
-	// Include paths that were dirty at baseline and are still dirty.
-	for p := range baseline {
-		changed[p] = true
-	}
-	out2 := make([]string, 0, len(changed))
-	for p := range changed {
-		out2 = append(out2, p)
-	}
-	sort.Strings(out2)
-	return out2, true
+	return out
 }
 
-// recordChangedFiles tracks files changed by an edit tool call.
+func pathFingerprint(dir, path string) string {
+	abs := filepath.Join(dir, filepath.FromSlash(path))
+	info, err := os.Lstat(abs)
+	if err != nil {
+		return "missing"
+	}
+	h := sha256.New()
+	h.Write([]byte(info.Mode().String()))
+	if info.Mode().IsRegular() {
+		if data, err := os.ReadFile(abs); err == nil {
+			h.Write(data)
+		}
+	} else if info.Mode()&os.ModeSymlink != 0 {
+		if target, err := os.Readlink(abs); err == nil {
+			h.Write([]byte(target))
+		}
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+func diffWorktree(dir string, baseline worktreeSnapshot) ([]string, bool) {
+	current := snapshotWorktree(dir)
+	if !current.complete {
+		return nil, false
+	}
+	changed := make([]string, 0)
+	for path, signature := range current.paths {
+		if baseline.paths[path] != signature {
+			changed = append(changed, path)
+		}
+	}
+	for path := range baseline.paths {
+		if _, ok := current.paths[path]; !ok {
+			changed = append(changed, path)
+		}
+	}
+	sort.Strings(changed)
+	return changed, true
+}
+
+func worktreeChanged(before, after worktreeSnapshot) bool {
+	if !before.complete || !after.complete || len(before.paths) != len(after.paths) {
+		return true
+	}
+	for path, signature := range before.paths {
+		if after.paths[path] != signature {
+			return true
+		}
+	}
+	return false
+}
+
 func recordChangedFiles(changed map[string]bool, _ string, tool, input string) {
 	if tool != "edit" {
 		return
@@ -84,7 +117,6 @@ func recordChangedFiles(changed map[string]bool, _ string, tool, input string) {
 	}
 }
 
-// isVerification reports whether a bash tool call has purpose "verification".
 func isVerification(input string) bool {
 	var args struct {
 		Purpose string `json:"purpose"`
@@ -95,7 +127,6 @@ func isVerification(input string) bool {
 	return args.Purpose == "verification"
 }
 
-// verificationCommand extracts the command from a verification bash call.
 func verificationCommand(input string) string {
 	var args struct {
 		Command string `json:"command"`
@@ -106,9 +137,6 @@ func verificationCommand(input string) string {
 	return args.Command
 }
 
-// exitCodeFromOutput parses the exit code from a bash tool result. The bash
-// tool reports a non-zero exit as "exit status N\n<output>"; a result without
-// that prefix is treated as exit code 0.
 func exitCodeFromOutput(output string) int {
 	if !strings.HasPrefix(output, "exit status ") {
 		return 0

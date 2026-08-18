@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -39,6 +40,12 @@ func New(baseURL, apiKey, model string) *Provider {
 // Complete sends the session and the available tools to the model and
 // streams the reply back as events.
 func (p *Provider) Complete(ctx context.Context, session *core.Session, tools []core.Tool, onEvent func(core.ProviderEvent)) error {
+	timeout := p.Timeout
+	if timeout <= 0 {
+		timeout = 5 * time.Minute
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 	req, err := p.buildRequest(ctx, session, tools)
 	if err != nil {
 		return err
@@ -124,7 +131,13 @@ func (p *Provider) Complete(ctx context.Context, session *core.Session, tools []
 	}
 
 	// Emit completed tool calls.
-	for _, pc := range calls {
+	indices := make([]int, 0, len(calls))
+	for index := range calls {
+		indices = append(indices, index)
+	}
+	sort.Ints(indices)
+	for _, index := range indices {
+		pc := calls[index]
 		call := &core.ToolCall{
 			ID:    pc.id,
 			Name:  pc.name,
@@ -222,13 +235,13 @@ type chatChoice struct {
 }
 
 type chatDelta struct {
-	Content    string        `json:"content,omitempty"`
+	Content   string         `json:"content,omitempty"`
 	ToolCalls []chatToolCall `json:"tool_calls,omitempty"`
 }
 
 type chatToolCall struct {
 	Index    int          `json:"index"`
-	ID      string       `json:"id"`
+	ID       string       `json:"id"`
 	Function chatCallFunc `json:"function"`
 }
 

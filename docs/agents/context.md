@@ -27,7 +27,7 @@ repository instructions were loaded and from where.
 ```sh
 kite context                 # context for a fresh session in this directory
 kite context sess_...        # context for a persisted session
-kite context sess_... --full # include repository instructions
+kite context --full sess_... # include repository instructions
 ```
 
 ## See also

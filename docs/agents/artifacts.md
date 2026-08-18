@@ -6,15 +6,15 @@ context.
 ## Creation threshold
 
 Outputs larger than 16 KiB are stored as artifacts. The tool result carries a
-compact preview (8 KiB head/tail) with the artifact ID, size, media type, and
-truncation metadata.
+compact 8 KiB preview, split between the head and tail, with the artifact ID,
+size, media type, and truncation metadata.
 
 ## Retrieval
 
 Retrieve an artifact by ID and byte offset:
 
 ```sh
-kite artifact art_... --offset 0 --limit 32768
+kite artifact --offset 0 --limit 32768 art_...
 ```
 
 ```json
@@ -37,8 +37,9 @@ session's artifact directory to reclaim space.
 ## Sensitivity
 
 Artifacts may contain repository content. They are stored with user-only
-permissions and are never included in error messages or logs. Treat them as
-sensitive to the repository they came from.
+permissions. Bounded previews are persisted in the session event log, but
+full artifact contents are not included in errors or events. Treat artifacts
+and session logs as sensitive to the repository they came from.
 
 ## See also
 

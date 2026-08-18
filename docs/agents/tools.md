@@ -13,8 +13,7 @@ Print a file with line numbers, or list a directory. Optional line range.
 {"path": "."}
 ```
 
-- Inline limit: 32 KiB. Larger files are stored as an artifact and referenced
-  in the result.
+- Large results follow the shared [artifact limits](artifacts.md).
 
 ## edit
 
@@ -61,7 +60,6 @@ Retrieve a stored artifact by ID and byte offset.
 
 ## Output limits
 
-- Inline cap: 16 KiB (outputs above this are stored as artifacts).
-- Artifact preview: 8 KiB head/tail.
-- Artifact retrieval: 32 KiB per call.
-- Read inline: 32 KiB.
+- Bash captures at most 32 KiB before the runtime applies the inline cap.
+- Shared inline, preview, and retrieval limits are owned by
+  [Artifacts](artifacts.md).

@@ -98,7 +98,8 @@ func boolv(m map[string]any, k string) bool { v, _ := m[k].(bool); return v }
 
 // Set holds the tools that work against a working directory.
 type Set struct {
-	Dir string
+	Dir   string
+	Store core.SessionStore
 }
 
 // All returns the read, edit, bash, and artifact tools as core.Tool values.

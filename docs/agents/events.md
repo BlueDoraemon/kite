@@ -6,7 +6,7 @@ its JSONL log.
 
 ## Lifecycle ordering
 
-A successful prompt emits:
+A successful prompt normally emits:
 
 ```text
 session.started
@@ -16,14 +16,18 @@ text.delta*      (as the model streams)
 usage
 model.completed
 tool.started*    (one per tool call)
+artifact.created* (before its tool.finished when a large output is stored)
+verification*    (before tool.finished for verification runs)
 tool.finished*
-artifact.created* (when a large output is stored)
 model.started    (next turn)
 ...
 session.completed
 ```
 
-A failed prompt ends with `session.failed` instead of `session.completed`.
+A resumed prompt may first emit `interrupted-tool` records left by an
+incomplete turn. A runtime failure ends with `session.failed` instead of
+`session.completed`. Failed or stale verification still ends with
+`session.completed`, whose `Result.status` is `failed`.
 
 ## Required event types
 
@@ -41,8 +45,8 @@ A failed prompt ends with `session.failed` instead of `session.completed`.
 - `user-message`
 - `model-completed`
 - `usage`
-- `resume`
--- `verification`
+- `resume` (reserved in v1; current resumes use the standard prompt lifecycle)
+- `verification`
 - `interrupted-tool`
 
 ## IDs

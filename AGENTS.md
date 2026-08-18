@@ -65,14 +65,14 @@ POSIX (`sh -c`, process groups) and Windows (`cmd.exe /C`, `taskkill /T`).
   `tool.started`, `tool.finished`, `artifact.created`, `session.completed`,
   `session.failed`. Supporting: `user-message`, `model-completed`, `usage`,
   `resume`, `verification`, `interrupted-tool`.
-- Outputs larger than 16 KiB are stored as artifacts with an 8 KiB head/tail
-  preview. Artifact retrieval is capped at 32 KiB per call.
+- Artifact thresholds and retrieval limits are owned by
+  `docs/agents/artifacts.md`.
 - Session and artifact IDs are globally unique and prefixed.
 
 ## Cross-platform requirements
 
-- Every release target (linux/darwin/windows × amd64/arm64) must build.
-  Shell execution and process-tree termination are build-tagged.
+- Every target in the release workflow must build. Shell execution and
+  process-tree termination are build-tagged.
 - Data directory: `$KITE_DATA_DIR`, else XDG data storage (Unix) or
   LOCALAPPDATA (Windows). User-only permissions where supported.
 
@@ -101,7 +101,7 @@ GOOS=darwin GOARCH=amd64 go build -o /dev/null ./cmd/kite
 GOOS=darwin GOARCH=arm64 go build -o /dev/null ./cmd/kite
 GOOS=windows GOARCH=amd64 go build -o /dev/null ./cmd/kite
 # schema generation check:
-go run ./internal/schemagen
+go run ./cmd/schemagen
 ```
 
 ## How to extend without breaking compatibility
@@ -142,8 +142,6 @@ ignored on load. Update `docs/agents/sessions.md`.
   scripted provider through bash fail → read → edit → verification bash pass
   against `testdata/broken-go-project`.
 - The live acceptance test is opt-in (`KITE_LIVE_TEST=1`).
-- Every RPC method is tested through its executable NDJSON interface.
-- Documentation is validated by: regenerating and comparing schemas, decoding
-  every example into production wire types, compiling Go examples, running
-  documented shell/RPC smoke examples against deterministic fixtures, and
-  checking internal Markdown links.
+- RPC framing is tested through its executable NDJSON interface.
+- Documentation validation regenerates and compares schemas, compiles the Go
+  examples, and checks internal Markdown links.

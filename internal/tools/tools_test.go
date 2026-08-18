@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/BlueDoraemon/kite-core/internal/core"
 )
 
 func TestReadFileShowsLineNumbers(t *testing.T) {
@@ -41,6 +43,21 @@ func TestReadLineRange(t *testing.T) {
 	}
 	if strings.Contains(out, "one") || strings.Contains(out, "four") {
 		t.Fatalf("range output includes out-of-range lines: %q", out)
+	}
+}
+
+func TestReadLargeFileStoredAsArtifact(t *testing.T) {
+	dir := t.TempDir()
+	content := strings.Repeat("large-content\n", 3000)
+	if err := os.WriteFile(filepath.Join(dir, "large.txt"), []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out, err := (&Set{Dir: dir}).Read().Run(context.Background(), `{"path":"large.txt"}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "stored as artifact") {
+		t.Fatalf("large read should be stored as artifact, got %q", out)
 	}
 }
 
@@ -157,22 +174,115 @@ func TestBashWorkingDir(t *testing.T) {
 
 func TestArtifactPaging(t *testing.T) {
 	dir := t.TempDir()
-	// Store a large artifact directly.
 	dataDir := filepath.Join(dir, "data")
-	if err := os.MkdirAll(filepath.Join(dataDir, "artifacts", "s1"), 0o755); err != nil {
+	t.Setenv("KITE_DATA_DIR", dataDir)
+	store, err := core.OpenStore()
+	if err != nil {
 		t.Fatal(err)
 	}
 	content := strings.Repeat("x", 100)
-	if err := os.WriteFile(filepath.Join(dataDir, "artifacts", "s1", "a1"), []byte(content), 0o644); err != nil {
+	sessionID := "sess_000000000000000000000001"
+	artifactID := "art_000000000000000000000001"
+	if err := store.StoreArtifact(sessionID, artifactID, []byte(content)); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("KITE_DATA_DIR", dataDir)
-	tool := (&Set{Dir: dir}).Artifact()
-	out, err := tool.Run(context.Background(), `{"id":"a1","offset":0,"limit":50}`)
+	tool := (&Set{Dir: dir, Store: store}).Artifact()
+	out, err := tool.Run(context.Background(), `{"id":"art_000000000000000000000001","offset":0,"limit":50}`)
 	if err != nil {
 		t.Fatalf("artifact failed: %v", err)
 	}
 	if len(out) != 50 {
 		t.Fatalf("artifact output = %d bytes, want 50", len(out))
+	}
+}
+
+func TestSmallBashOutputStaysInline(t *testing.T) {
+	dir := t.TempDir()
+	tool := (&Set{Dir: dir}).Bash()
+	out, err := tool.Run(context.Background(), `{"command":"printf hello"}`)
+	if err != nil {
+		t.Fatalf("bash failed: %v", err)
+	}
+	if out != "hello" {
+		t.Fatalf("bash output = %q, want inline 'hello'", out)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".kite")); !os.IsNotExist(err) {
+		t.Fatalf("no artifact dir expected for small output, err = %v", err)
+	}
+}
+
+func TestLargeBashOutputStoredAsArtifact(t *testing.T) {
+	dir := t.TempDir()
+	tool := (&Set{Dir: dir}).Bash()
+	// 20 KiB of output exceeds the inline cap, so it must become an artifact.
+	out, err := tool.Run(context.Background(), `{"command":"head -c 20480 /dev/zero | tr '\\0' 'a'"}`)
+	if err != nil {
+		t.Fatalf("bash failed: %v", err)
+	}
+	if strings.Contains(out, "stored as artifact") == false || strings.Contains(out, "artifacts/") == false {
+		t.Fatalf("bash output = %q, want artifact reference", out)
+	}
+	// Parse the artifact path out and confirm it exists and matches size.
+	idx := strings.Index(out, ".kite/")
+	if idx < 0 {
+		t.Fatalf("no artifact path in output: %q", out)
+	}
+	rest := out[idx:]
+	rel := strings.Fields(rest)[0]
+	full := filepath.Join(dir, rel)
+	data, err := os.ReadFile(full)
+	if err != nil {
+		t.Fatalf("artifact file %s unreadable: %v", full, err)
+	}
+	if len(data) != 20480 {
+		t.Fatalf("artifact size = %d, want 20480", len(data))
+	}
+	// The result preview must be a truncated head/tail, not the full output.
+	if len(out) >= 20480 {
+		t.Fatalf("tool result should carry a preview, got %d bytes inline", len(out))
+	}
+}
+
+func TestLargeReadStoredAsArtifact(t *testing.T) {
+	dir := t.TempDir()
+	big := strings.Repeat("x", 20*1024) + "\n"
+	if err := os.WriteFile(filepath.Join(dir, "big.txt"), []byte(big), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tool := (&Set{Dir: dir}).Read()
+	out, err := tool.Run(context.Background(), `{"path":"big.txt"}`)
+	if err != nil {
+		t.Fatalf("read failed: %v", err)
+	}
+	if strings.Contains(out, "stored as artifact") == false {
+		t.Fatalf("read output = %q, want artifact reference", out)
+	}
+	// The artifact must contain the line-numbered content.
+	idx := strings.Index(out, ".kite/")
+	if idx < 0 {
+		t.Fatalf("no artifact path in output: %q", out)
+	}
+	full := filepath.Join(dir, strings.Fields(out[idx:])[0])
+	data, err := os.ReadFile(full)
+	if err != nil {
+		t.Fatalf("artifact file unreadable: %v", err)
+	}
+	if !strings.Contains(string(data), "   1\txxxxxxxx") {
+		t.Fatalf("artifact should carry line-numbered content")
+	}
+}
+
+func TestSmallReadStaysInline(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "src.go"), []byte("package main\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	set := &Set{Dir: dir}
+	out, err := set.Read().Run(context.Background(), `{"path":"src.go"}`)
+	if err != nil {
+		t.Fatalf("read failed: %v", err)
+	}
+	if strings.Contains(out, "stored as artifact") {
+		t.Fatalf("small file should be inline, got %q", out)
 	}
 }

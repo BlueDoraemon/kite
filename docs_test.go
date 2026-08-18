@@ -1,12 +1,41 @@
 package kite_test
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	kite "github.com/BlueDoraemon/kite-core"
 )
+
+type toolCountingProvider struct{ count int }
+
+func (p *toolCountingProvider) Complete(_ context.Context, _ *kite.Session, tools []kite.Tool, onEvent func(kite.ProviderEvent)) error {
+	p.count = len(tools)
+	onEvent(kite.ProviderEvent{Done: true})
+	return nil
+}
+
+func TestPublicSessionInstallsBuiltins(t *testing.T) {
+	provider := &toolCountingProvider{}
+	dir := t.TempDir()
+	session, err := kite.NewSession(kite.Config{Provider: provider, Model: "m", WorkingDir: dir, DataDir: filepath.Join(dir, "data")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	events, err := session.Prompt(context.Background(), "inspect")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range events {
+	}
+	if provider.count != 4 {
+		t.Fatalf("public session advertised %d tools, want 4", provider.count)
+	}
+}
 
 // TestExamplesCompile ensures every Go example builds.
 func TestExamplesCompile(t *testing.T) {

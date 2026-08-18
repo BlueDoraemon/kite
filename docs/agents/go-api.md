@@ -3,14 +3,27 @@
 The root package `kite` is the public façade. It re-exports the neutral types
 backed by `internal/core`.
 
-## Public types
+## Session API
 
 - `NewSession(Config) (*Session, error)`
 - `LoadSession(Config, id string) (*Session, error)`
 - `(*Session).Prompt(ctx, text) (<-chan Event, error)`
 - `(*Session).BuildContext() []Message`
-- `Provider`, `Tool`, `Message`, `Event`, `Artifact`, `Usage`, `Result`,
-  `Error`
+- `(*Session).DataDir() string`
+
+`Config` selects the provider, model, working and data directories, tools,
+inline and preview limits, and maximum turns. A nil `Config.Tools` installs
+the four built-in tools.
+
+## Public contracts
+
+- Runtime interfaces and values: `Provider`, `Tool`, `NoopProvider`,
+  `ProviderEvent`, `Message`, `ToolCall`, `Event`, `Artifact`, `Usage`,
+  `Result`, `Verification`, and `Error`.
+- Persistence and context: `SessionStore`, `LoadInstructions`,
+  `SystemInstructions`, and `Context`.
+- Typed event payloads, role and event constants, and the four contract
+  version constants are also exported by the root package.
 
 ## Lifecycle
 

@@ -3,6 +3,7 @@ package core
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 )
 
@@ -35,6 +36,20 @@ func LoadInstructions(dir string) (Instructions, error) {
 	if err != nil {
 		return Instructions{}, err
 	}
+	if resolved, err := filepath.EvalSymlinks(abs); err == nil {
+		abs = resolved
+	}
+	root := abs
+	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+	cmd.Dir = abs
+	if out, err := cmd.Output(); err == nil {
+		if candidate := filepath.Clean(string(bytesTrimSpace(out))); candidate != "." {
+			root = candidate
+			if resolved, err := filepath.EvalSymlinks(root); err == nil {
+				root = resolved
+			}
+		}
+	}
 	cur := abs
 	for {
 		candidate := filepath.Join(cur, "AGENTS.md")
@@ -48,12 +63,26 @@ func LoadInstructions(dir string) (Instructions, error) {
 			}
 			return Instructions{Path: candidate, Content: string(data)}, nil
 		}
+		if cur == root {
+			return Instructions{}, nil
+		}
 		parent := filepath.Dir(cur)
 		if parent == cur {
 			return Instructions{}, nil
 		}
 		cur = parent
 	}
+}
+
+func bytesTrimSpace(data []byte) []byte {
+	start, end := 0, len(data)
+	for start < end && (data[start] == ' ' || data[start] == '\n' || data[start] == '\r' || data[start] == '\t') {
+		start++
+	}
+	for end > start && (data[end-1] == ' ' || data[end-1] == '\n' || data[end-1] == '\r' || data[end-1] == '\t') {
+		end--
+	}
+	return data[start:end]
 }
 
 // buildContext returns the deterministic context for a session: fixed system

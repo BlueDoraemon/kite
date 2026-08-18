@@ -22,7 +22,7 @@ kite status
 
 echo "== retrieve an artifact =="
 # Replace ART_ID with an artifact id from a tool result.
-# kite artifact "$ART_ID" --offset 0 --limit 32768
+# kite artifact --offset 0 --limit 32768 "$ART_ID"
 
 echo "== rpc =="
 printf '%s\n' \

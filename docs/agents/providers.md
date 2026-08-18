@@ -11,6 +11,12 @@ streams over Server-Sent Events.
 | `KITE_BASE_URL` | `-base-url` | `https://api.openai.com/v1` | API base URL |
 | `KITE_MODEL` | `-model` | `gpt-4o-mini` | Model identifier |
 
+Without `--from-crush`, explicit flags override Kite environment variables,
+which override defaults. With `--from-crush`, explicit `-base-url` and
+`-model` flags override imported values, and `KITE_API_KEY` overrides the
+imported credential. `KITE_BASE_URL` and `KITE_MODEL` are only consulted when
+Crush import is not active.
+
 ## Streaming behaviour
 
 The provider sends a streaming chat completions request and parses the SSE

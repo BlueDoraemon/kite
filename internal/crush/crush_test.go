@@ -69,6 +69,17 @@ func TestLoadRejectsMissingEndpoint(t *testing.T) {
 	}
 }
 
+func TestLoadRejectsMissingLargeModel(t *testing.T) {
+	parent := writeFixtures(t,
+		`[{"id":"openai","type":"openai","api_key":"k","api_endpoint":"https://api.example.com/v1"}]`,
+		`{"providers":{"openai":{"api_key":"k"}},"models":{}}`,
+	)
+	t.Setenv("XDG_DATA_HOME", parent)
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "no large model") {
+		t.Fatalf("expected missing large model error, got %v", err)
+	}
+}
+
 func TestLoadRejectsExpiredOAuth(t *testing.T) {
 	parent := writeFixtures(t,
 		`[{"id":"openai","type":"openai","api_endpoint":"https://api.example.com/v1"}]`,

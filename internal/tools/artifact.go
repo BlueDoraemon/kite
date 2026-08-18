@@ -3,8 +3,6 @@ package tools
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 )
 
 // maxArtifactRead caps how much of an artifact is returned per retrieval.
@@ -40,48 +38,14 @@ func (s *Set) Artifact() *Tool {
 	}
 }
 
-// readArtifact reads an artifact from the data directory. The artifact ID
-// encodes the session prefix (art_<session>_<id>), so no session argument is
-// needed.
+// readArtifact reads an artifact from the data directory. Artifact IDs are
+// globally unique, so the store can find one without a session argument.
 func (s *Set) readArtifact(id string, offset, limit int64) ([]byte, error) {
-	// The artifact ID format is art_<sessionID>_<rand>. Find the file by
-	// scanning the artifacts directory.
-	dataDir := os.Getenv("KITE_DATA_DIR")
-	if dataDir == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return nil, err
-		}
-		dataDir = filepath.Join(home, ".local", "share", "kite")
-	}
-	root := filepath.Join(dataDir, "artifacts")
-	// Search all session directories for the artifact file.
-	var found string
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return nil
-		}
-		if !info.IsDir() && info.Name() == id {
-			found = path
-			return filepath.SkipAll
-		}
-		return nil
+	store, ok := s.Store.(interface {
+		LoadArtifactByID(string, int64, int64) ([]byte, error)
 	})
-	if err != nil || found == "" {
-		return nil, fmt.Errorf("artifact %s not found", id)
+	if !ok {
+		return nil, fmt.Errorf("artifact store is unavailable")
 	}
-	fh, err := os.Open(found)
-	if err != nil {
-		return nil, err
-	}
-	defer fh.Close()
-	if _, err := fh.Seek(offset, 0); err != nil {
-		return nil, err
-	}
-	buf := make([]byte, limit)
-	n, err := fh.Read(buf)
-	if err != nil && err.Error() != "EOF" {
-		return nil, err
-	}
-	return buf[:n], nil
+	return store.LoadArtifactByID(id, offset, limit)
 }

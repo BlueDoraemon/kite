@@ -1,7 +1,7 @@
 // Package schemagen generates the versioned JSON schemas for Kite's machine
-// contracts from the runtime wire types. Run it with:
+// contracts. Run it with:
 //
-//	go run ./internal/schemagen
+//	go run ./cmd/schemagen
 //
 // The generated schemas are committed under docs/schemas/v1. A generation
 // check fails when the committed schemas differ from the runtime types.
@@ -51,9 +51,9 @@ func Generate(dir string) ([]string, error) {
 			Version: "kite.result/v1",
 			Type:    "object",
 			Properties: map[string]any{
-				"status":               map[string]any{"type": "string", "enum": []string{"completed", "failed"}},
-				"text":                 map[string]any{"type": "string"},
-				"changed_files":        map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+				"status":                 map[string]any{"type": "string", "enum": []string{"completed", "failed"}},
+				"text":                   map[string]any{"type": "string"},
+				"changed_files":          map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
 				"changed_files_complete": map[string]any{"type": "boolean"},
 				"verification": map[string]any{
 					"type": "object",
@@ -142,10 +142,10 @@ func Check(dir string) error {
 		}
 		cData, err := os.ReadFile(committed)
 		if err != nil {
-			return fmt.Errorf("schema %s is missing; run go run ./internal/schemagen", name)
+			return fmt.Errorf("schema %s is missing; run go run ./cmd/schemagen", name)
 		}
 		if string(gData) != string(cData) {
-			return fmt.Errorf("schema %s is out of date; run go run ./internal/schemagen", name)
+			return fmt.Errorf("schema %s is out of date; run go run ./cmd/schemagen", name)
 		}
 	}
 	return nil

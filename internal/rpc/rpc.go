@@ -123,15 +123,15 @@ type ArtifactParams struct {
 // ContextParams is the params for the context method.
 type ContextParams struct {
 	SessionID string `json:"session_id,omitempty"`
-	Full      bool    `json:"full,omitempty"`
+	Full      bool   `json:"full,omitempty"`
 }
 
 // StatusResult is the result of the status method.
 type StatusResult struct {
-	SessionID string        `json:"session_id"`
-	Model     string        `json:"model"`
-	Turn      int           `json:"turn"`
-	Messages  int           `json:"messages"`
+	SessionID   string          `json:"session_id"`
+	Model       string          `json:"model"`
+	Turn        int             `json:"turn"`
+	Messages    int             `json:"messages"`
 	Interrupted []core.ToolCall `json:"interrupted,omitempty"`
 }
 

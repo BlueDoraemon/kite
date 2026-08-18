@@ -7,10 +7,6 @@ import (
 	"strings"
 )
 
-// maxInlineRead caps how much of a file is returned inline before it is
-// stored as an artifact.
-const maxInlineRead = 32 * 1024
-
 // Read returns a Tool that prints a file (or directory listing) with line
 // numbers. Large files are stored as artifacts and referenced in the result.
 func (s *Set) Read() *Tool {
@@ -45,10 +41,7 @@ func (s *Set) Read() *Tool {
 			if startLine > 0 || endLine > 0 {
 				content = lineRange(content, startLine, endLine)
 			}
-			if len(content) > maxInlineRead {
-				return fmt.Sprintf("[large file %d bytes; use artifact retrieval]", len(content)), nil
-			}
-			return content, nil
+			return s.inlineIfSmall("read", content), nil
 		},
 	}
 }

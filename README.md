@@ -49,8 +49,8 @@ kite run --from-crush "explain this repository"
 | `KITE_MODEL` | `-model` | `gpt-4o-mini` | Model identifier |
 | `KITE_DATA_DIR` | (none) | XDG/LOCALAPPDATA | Where sessions and artifacts are stored |
 
-Precedence: explicit flags → Kite environment variables → `--from-crush`
-import → defaults.
+See [Providers](docs/agents/providers.md) for configuration precedence and
+`--from-crush` behavior.
 
 ### Your first successful task
 
@@ -60,8 +60,9 @@ kite run "create a file called hello.txt containing 'hello kite'"
 
 The agent reads, edits, and verifies within the current directory. When it
 finishes, Kite prints a structured result: status, changed files, and any
-verification outcome. The session is persisted under `$KITE_DATA_DIR` and can
-be resumed with `kite resume <session-id>`.
+verification outcome. The session is persisted under the configured data
+directory (or the platform default) and can be resumed with
+`kite resume <session-id>`.
 
 ## Architecture
 
@@ -87,8 +88,8 @@ session -> context -> provider -> tools -> artifacts -> events
 | `kite rpc` | Serve the NDJSON RPC protocol on stdin/stdout |
 | `kite status [session-id]` | Show session status |
 | `kite inspect <tool-id>` | Show a tool's schema |
-| `kite artifact <artifact-id> [--offset N --limit N]` | Retrieve an artifact |
-| `kite context [session-id] [--full]` | Show the session context |
+| `kite artifact [--offset N --limit N] <artifact-id>` | Retrieve an artifact |
+| `kite context [--full] [session-id]` | Show the session context |
 
 Exit codes: `0` completed, `1` runtime or verification failure, `2` usage or
 configuration error.
