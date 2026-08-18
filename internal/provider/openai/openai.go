@@ -14,7 +14,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/BlueDoraemon/kite/internal/kite"
+	"github.com/BlueDoraemon/kite-core/internal/kite"
 )
 
 // retryableStatuses are HTTP status codes that warrant a retry with backoff.

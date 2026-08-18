@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/BlueDoraemon/kite/internal/kite"
+	"github.com/BlueDoraemon/kite-core/internal/kite"
 )
 
 // Tool is a named function the model can call. It implements kite.Tool.

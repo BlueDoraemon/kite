@@ -13,9 +13,9 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/BlueDoraemon/kite/internal/kite"
-	"github.com/BlueDoraemon/kite/internal/provider/openai"
-	"github.com/BlueDoraemon/kite/internal/tools"
+	"github.com/BlueDoraemon/kite-core/internal/kite"
+	"github.com/BlueDoraemon/kite-core/internal/provider/openai"
+	"github.com/BlueDoraemon/kite-core/internal/tools"
 )
 
 func main() {

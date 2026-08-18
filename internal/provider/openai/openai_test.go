@@ -9,7 +9,7 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/BlueDoraemon/kite/internal/kite"
+	"github.com/BlueDoraemon/kite-core/internal/kite"
 )
 
 // stubTool is a minimal kite.Tool used to verify tool advertisement.
