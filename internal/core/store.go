@@ -79,6 +79,9 @@ func (f *FileStore) AppendEvent(sessionID string, ev *Event) error {
 	if err != nil {
 		return err
 	}
+	if err := f.validateLeaseOwnership(sessionID); err != nil {
+		return err
+	}
 	fh, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		return err
@@ -88,6 +91,27 @@ func (f *FileStore) AppendEvent(sessionID string, ev *Event) error {
 		return err
 	}
 	return fh.Sync()
+}
+
+func (f *FileStore) validateLeaseOwnership(sessionID string) error {
+	path, err := f.leasePath(sessionID)
+	if err != nil {
+		return err
+	}
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	owned := f.leaseToken(sessionID)
+	var stamp int64
+	var current string
+	if _, err := fmt.Sscanf(string(data), "%d %s", &stamp, &current); err != nil || owned == "" || current != owned {
+		return fmt.Errorf("kite: session %s lease is not owned", sessionID)
+	}
+	return nil
 }
 
 // LoadEvents returns all durable events for a session in order. Truncated or

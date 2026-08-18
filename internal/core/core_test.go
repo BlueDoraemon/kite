@@ -69,6 +69,18 @@ func (echoTool) Run(ctx context.Context, input string) (string, error) {
 	return "echo:" + input, nil
 }
 
+type testTool struct {
+	name string
+	run  func() (string, error)
+}
+
+func (t testTool) Name() string        { return t.name }
+func (t testTool) Description() string { return t.name }
+func (t testTool) Schema() any         { return map[string]any{"type": "object"} }
+func (t testTool) Run(context.Context, string) (string, error) {
+	return t.run()
+}
+
 func TestRunToolCallThenFinishes(t *testing.T) {
 	p := &scriptProvider{turns: []turn{
 		{toolCalls: []ToolCall{{ID: "c1", Name: "echo", Input: `{"x":1}`}}},
@@ -485,6 +497,142 @@ func TestReplayPreservesSequenceAndToolOnlyTurn(t *testing.T) {
 	}
 	if firstSeq != prior+1 {
 		t.Fatalf("first resumed seq = %d, want %d", firstSeq, prior+1)
+	}
+}
+
+func TestReplayDiscardsIncompleteModelText(t *testing.T) {
+	dir := t.TempDir()
+	store, err := openStore(filepath.Join(dir, "data"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	events := []*Event{
+		{ID: "e1", Seq: 1, SessionID: testSessionID, Type: EventUserMessage, Payload: &UserMessagePayload{Text: "hello"}},
+		{ID: "e2", Seq: 2, SessionID: testSessionID, Type: EventModelStarted, Payload: &ModelStartedPayload{Turn: 1}},
+		{ID: "e3", Seq: 3, SessionID: testSessionID, Type: EventTextDelta, Payload: &TextDeltaPayload{Text: "partial"}},
+	}
+	for _, ev := range events {
+		if err := store.AppendEvent(testSessionID, ev); err != nil {
+			t.Fatal(err)
+		}
+	}
+	loaded, err := LoadSession(Config{Provider: NoopProvider{}, Model: "m", WorkingDir: dir, DataDir: filepath.Join(dir, "data"), Tools: []Tool{}}, testSessionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, msg := range loaded.Messages {
+		if msg.Role == RoleAssistant {
+			t.Fatalf("incomplete assistant message was replayed: %+v", msg)
+		}
+	}
+}
+
+func TestReplayKeepsToolBatchAndDurableInterruption(t *testing.T) {
+	dir := t.TempDir()
+	dataDir := filepath.Join(dir, "data")
+	store, err := openStore(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	calls := []ToolCall{{ID: "c1", Name: "echo", Input: `{}`}, {ID: "c2", Name: "echo", Input: `{}`}}
+	events := []*Event{
+		{ID: "e1", Seq: 1, SessionID: testSessionID, Type: EventModelStarted, Payload: &ModelStartedPayload{Turn: 1}},
+		{ID: "e2", Seq: 2, SessionID: testSessionID, Type: EventModelCompleted, Payload: &ModelCompletedPayload{Turn: 1}},
+		{ID: "e3", Seq: 3, SessionID: testSessionID, Type: EventToolStarted, Payload: &ToolStartedPayload{CallID: "c1", Name: "echo", Input: `{}`}},
+		{ID: "e4", Seq: 4, SessionID: testSessionID, Type: EventToolFinished, Payload: &ToolFinishedPayload{CallID: "c1", Name: "echo", Output: "one"}},
+		{ID: "e5", Seq: 5, SessionID: testSessionID, Type: EventToolStarted, Payload: &ToolStartedPayload{CallID: "c2", Name: "echo", Input: `{}`}},
+		{ID: "e6", Seq: 6, SessionID: testSessionID, Type: EventInterruptedTool, Payload: &InterruptedToolPayload{Call: &calls[1]}},
+	}
+	for _, ev := range events {
+		if err := store.AppendEvent(testSessionID, ev); err != nil {
+			t.Fatal(err)
+		}
+	}
+	loaded, err := LoadSession(Config{Provider: NoopProvider{}, Model: "m", WorkingDir: dir, DataDir: dataDir, Tools: []Tool{}}, testSessionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var assistants []Message
+	toolResults := map[string]bool{}
+	for _, msg := range loaded.Messages {
+		if msg.Role == RoleAssistant {
+			assistants = append(assistants, msg)
+		}
+		if msg.Role == RoleTool {
+			toolResults[msg.ToolCallID] = true
+		}
+	}
+	if len(assistants) != 1 || len(assistants[0].ToolCalls) != 2 {
+		t.Fatalf("replayed assistant turns = %+v", assistants)
+	}
+	if !toolResults["c1"] || !toolResults["c2"] {
+		t.Fatalf("replayed tool results = %+v", toolResults)
+	}
+}
+
+func TestCustomMutationStalesVerification(t *testing.T) {
+	dir := t.TempDir()
+	cmd := exec.Command("git", "init", "-q")
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v: %s", err, out)
+	}
+	mutated := filepath.Join(dir, "changed.txt")
+	tools := []Tool{
+		testTool{name: "bash", run: func() (string, error) { return "ok", nil }},
+		testTool{name: "mutate", run: func() (string, error) {
+			if err := os.WriteFile(mutated, []byte("changed"), 0o600); err != nil {
+				return "", err
+			}
+			return "changed", nil
+		}},
+	}
+	provider := &scriptProvider{turns: []turn{
+		{toolCalls: []ToolCall{{ID: "v1", Name: "bash", Input: `{"command":"check","purpose":"verification"}`}}},
+		{toolCalls: []ToolCall{{ID: "m1", Name: "mutate", Input: `{}`}}},
+		{text: "done"},
+	}}
+	s, err := NewSession(Config{Provider: provider, Model: "m", WorkingDir: dir, DataDir: filepath.Join(dir, "data"), Tools: tools})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ch, err := s.Prompt(context.Background(), "go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result *Result
+	for ev := range ch {
+		if ev.Type == EventSessionCompleted {
+			result = ev.Payload.(*SessionCompletedPayload).Result
+		}
+	}
+	if result == nil || result.Status != "failed" || result.Verification == nil || !result.Verification.Stale {
+		t.Fatalf("result after custom mutation = %+v", result)
+	}
+}
+
+func TestSupersededLeaseOwnerCannotAppend(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), "data")
+	oldStore, err := openStore(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	newStore, err := openStore(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := oldStore.AcquireLease(testSessionID, time.Nanosecond); err != nil {
+		t.Fatal(err)
+	}
+	if err := newStore.AcquireLease(testSessionID, time.Nanosecond); err != nil {
+		t.Fatal(err)
+	}
+	ev := &Event{ID: "e1", Seq: 1, SessionID: testSessionID, Type: EventSessionStarted}
+	if err := oldStore.AppendEvent(testSessionID, ev); err == nil {
+		t.Fatal("superseded lease owner appended an event")
+	}
+	if err := newStore.AppendEvent(testSessionID, ev); err != nil {
+		t.Fatalf("current lease owner append: %v", err)
 	}
 }
 

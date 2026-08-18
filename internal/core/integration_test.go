@@ -76,6 +76,7 @@ func TestIntegrationBashFailReadEditVerifyPass(t *testing.T) {
 	var types []string
 	var result *core.Result
 	var verifications []*core.Verification
+	var toolStarts, toolFinishes int
 	for ev := range ch {
 		types = append(types, ev.Type)
 		switch ev.Type {
@@ -83,15 +84,17 @@ func TestIntegrationBashFailReadEditVerifyPass(t *testing.T) {
 			result = ev.Payload.(*core.SessionCompletedPayload).Result
 		case core.EventVerification:
 			verifications = append(verifications, ev.Payload.(*core.VerificationPayload).Verification)
+		case core.EventToolStarted:
+			toolStarts++
 		case core.EventToolFinished:
+			toolFinishes++
 			p := ev.Payload.(*core.ToolFinishedPayload)
 			fmt.Printf("tool %s finished: %q\n", p.Name, p.Output)
 		}
 	}
 
-	joined := strings.Join(types, ",")
-	if !strings.Contains(joined, "tool.started,tool.finished") {
-		t.Fatalf("no tool calls in event stream: %s", joined)
+	if toolStarts == 0 || toolStarts != toolFinishes {
+		t.Fatalf("tool starts=%d finishes=%d in event stream: %s", toolStarts, toolFinishes, strings.Join(types, ","))
 	}
 	if result == nil || result.Status != "completed" {
 		t.Fatalf("result = %+v", result)

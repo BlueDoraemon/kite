@@ -26,6 +26,7 @@ stream:
 - Tool calls arrive fragmented and are assembled by index.
 - Usage arrives in the final chunk.
 - `[DONE]` ends the stream.
+- Each chat completion request has a five-minute deadline.
 
 ## Errors
 
