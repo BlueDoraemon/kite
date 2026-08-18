@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/BlueDoraemon/kite-core/internal/core"
 )
@@ -92,6 +93,46 @@ func TestCompleteFragmentedToolCall(t *testing.T) {
 	}
 	if calls[0].Name != "read" || !strings.Contains(calls[0].Input, "go.mod") {
 		t.Fatalf("call = %+v", calls[0])
+	}
+}
+
+func TestCompleteEmitsToolCallsByProviderIndex(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Write([]byte("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":1,\"id\":\"c2\",\"function\":{\"name\":\"second\",\"arguments\":\"{}\"}},{\"index\":0,\"id\":\"c1\",\"function\":{\"name\":\"first\",\"arguments\":\"{}\"}}]}}]}\n\ndata: [DONE]\n\n"))
+	}))
+	defer srv.Close()
+	p := New(srv.URL, "", "m")
+	var names []string
+	if err := p.Complete(context.Background(), newSession(), nil, func(pe core.ProviderEvent) {
+		if pe.ToolCall != nil {
+			names = append(names, pe.ToolCall.Name)
+		}
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(names, ",") != "first,second" {
+		t.Fatalf("tool call order = %v", names)
+	}
+}
+
+func TestCompleteAppliesConfiguredTimeout(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.WriteHeader(http.StatusOK)
+		w.(http.Flusher).Flush()
+		<-r.Context().Done()
+	}))
+	defer srv.Close()
+	p := New(srv.URL, "", "m")
+	p.Timeout = 20 * time.Millisecond
+	start := time.Now()
+	err := p.Complete(context.Background(), newSession(), nil, func(core.ProviderEvent) {})
+	if err == nil {
+		t.Fatal("expected request timeout")
+	}
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Fatalf("configured timeout took %s", elapsed)
 	}
 }
 

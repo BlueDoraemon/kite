@@ -3,8 +3,11 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"time"
 )
 
@@ -39,22 +42,36 @@ func OpenStore() (*FileStore, error) {
 
 // FileStore persists sessions and artifacts to the filesystem.
 type FileStore struct {
-	dir string
+	dir         string
+	leaseMu     sync.Mutex
+	leaseTokens map[string]string
 }
 
 // sessionPath returns the JSONL path for a session.
-func (f *FileStore) sessionPath(id string) string {
-	return filepath.Join(f.dir, "sessions", id+".jsonl")
+func (f *FileStore) sessionPath(id string) (string, error) {
+	if err := validateID(id, "sess"); err != nil {
+		return "", err
+	}
+	return filepath.Join(f.dir, "sessions", id+".jsonl"), nil
 }
 
 // artifactPath returns the artifact path for a session and artifact.
-func (f *FileStore) artifactPath(sessionID, artifactID string) string {
-	return filepath.Join(f.dir, "artifacts", sessionID, artifactID)
+func (f *FileStore) artifactPath(sessionID, artifactID string) (string, error) {
+	if err := validateID(sessionID, "sess"); err != nil {
+		return "", err
+	}
+	if err := validateID(artifactID, "art"); err != nil {
+		return "", err
+	}
+	return filepath.Join(f.dir, "artifacts", sessionID, artifactID), nil
 }
 
 // AppendEvent durably appends an event to the session log.
 func (f *FileStore) AppendEvent(sessionID string, ev *Event) error {
-	path := f.sessionPath(sessionID)
+	path, err := f.sessionPath(sessionID)
+	if err != nil {
+		return err
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
@@ -77,7 +94,10 @@ func (f *FileStore) AppendEvent(sessionID string, ev *Event) error {
 // malformed trailing records are ignored so a crash mid-write cannot corrupt
 // the log.
 func (f *FileStore) LoadEvents(sessionID string) ([]*Event, error) {
-	path := f.sessionPath(sessionID)
+	path, err := f.sessionPath(sessionID)
+	if err != nil {
+		return nil, err
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -179,16 +199,27 @@ func splitLines(data []byte) [][]byte {
 
 // StoreArtifact writes an artifact's content.
 func (f *FileStore) StoreArtifact(sessionID, artifactID string, content []byte) error {
-	dir := filepath.Join(f.dir, "artifacts", sessionID)
+	path, err := f.artifactPath(sessionID, artifactID)
+	if err != nil {
+		return err
+	}
+	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(dir, artifactID), content, 0o600)
+	return os.WriteFile(path, content, 0o600)
 }
 
 // LoadArtifact reads up to limit bytes of an artifact starting at offset.
 func (f *FileStore) LoadArtifact(sessionID, artifactID string, offset, limit int64) ([]byte, error) {
-	fh, err := os.Open(f.artifactPath(sessionID, artifactID))
+	path, err := f.artifactPath(sessionID, artifactID)
+	if err != nil {
+		return nil, err
+	}
+	if offset < 0 {
+		return nil, fmt.Errorf("kite: artifact offset must not be negative")
+	}
+	fh, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
@@ -196,12 +227,12 @@ func (f *FileStore) LoadArtifact(sessionID, artifactID string, offset, limit int
 	if _, err := fh.Seek(offset, 0); err != nil {
 		return nil, err
 	}
-	if limit <= 0 {
+	if limit <= 0 || limit > 32*1024 {
 		limit = 32 * 1024
 	}
 	buf := make([]byte, limit)
 	n, err := fh.Read(buf)
-	if err != nil && err.Error() != "EOF" {
+	if err != nil && err != io.EOF {
 		return nil, err
 	}
 	return buf[:n], nil
@@ -209,7 +240,11 @@ func (f *FileStore) LoadArtifact(sessionID, artifactID string, offset, limit int
 
 // ArtifactSize returns the stored size of an artifact.
 func (f *FileStore) ArtifactSize(sessionID, artifactID string) (int64, error) {
-	st, err := os.Stat(f.artifactPath(sessionID, artifactID))
+	path, err := f.artifactPath(sessionID, artifactID)
+	if err != nil {
+		return 0, err
+	}
+	st, err := os.Stat(path)
 	if err != nil {
 		return 0, err
 	}
@@ -226,15 +261,21 @@ func (f *FileStore) ListSessions() ([]string, error) {
 	for _, e := range entries {
 		name := e.Name()
 		if filepath.Ext(name) == ".jsonl" {
-			out = append(out, name[:len(name)-len(".jsonl")])
+			id := name[:len(name)-len(".jsonl")]
+			if validateID(id, "sess") == nil {
+				out = append(out, id)
+			}
 		}
 	}
 	return out, nil
 }
 
 // leasePath returns the lease file for a session.
-func (f *FileStore) leasePath(sessionID string) string {
-	return filepath.Join(f.dir, "sessions", sessionID+".lease")
+func (f *FileStore) leasePath(sessionID string) (string, error) {
+	if err := validateID(sessionID, "sess"); err != nil {
+		return "", err
+	}
+	return filepath.Join(f.dir, "sessions", sessionID+".lease"), nil
 }
 
 // AcquireLease takes the per-session lease. It refuses concurrent writers
@@ -243,13 +284,18 @@ func (f *FileStore) AcquireLease(sessionID string, ttl time.Duration) error {
 	if ttl <= 0 {
 		ttl = 5 * time.Minute
 	}
-	path := f.leasePath(sessionID)
+	path, err := f.leasePath(sessionID)
+	if err != nil {
+		return err
+	}
 	now := time.Now().Unix()
+	token := newID("lease")
 	// Try to create the lease exclusively.
 	fh, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err == nil {
-		fmt.Fprintf(fh, "%d\n", now)
+		fmt.Fprintf(fh, "%d %s\n", now, token)
 		fh.Close()
+		f.rememberLease(sessionID, token)
 		return nil
 	}
 	if !os.IsExist(err) {
@@ -270,8 +316,9 @@ func (f *FileStore) AcquireLease(sessionID string, ttl time.Duration) error {
 		if err != nil {
 			return fmt.Errorf("kite: session %s is leased by another writer", sessionID)
 		}
-		fmt.Fprintf(fh, "%d\n", now)
+		fmt.Fprintf(fh, "%d %s\n", now, token)
 		fh.Close()
+		f.rememberLease(sessionID, token)
 		return nil
 	}
 	return fmt.Errorf("kite: session %s is leased by another writer", sessionID)
@@ -279,15 +326,114 @@ func (f *FileStore) AcquireLease(sessionID string, ttl time.Duration) error {
 
 // ReleaseLease releases the per-session lease.
 func (f *FileStore) ReleaseLease(sessionID string) error {
-	err := os.Remove(f.leasePath(sessionID))
-	if os.IsNotExist(err) {
+	path, err := f.leasePath(sessionID)
+	if err != nil {
+		return err
+	}
+	token := f.leaseToken(sessionID)
+	if token == "" {
 		return nil
+	}
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		f.forgetLease(sessionID)
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	var stamp int64
+	var current string
+	if _, err := fmt.Sscanf(string(data), "%d %s", &stamp, &current); err != nil || current != token {
+		f.forgetLease(sessionID)
+		return nil
+	}
+	err = os.Remove(path)
+	if os.IsNotExist(err) {
+		f.forgetLease(sessionID)
+		return nil
+	}
+	if err == nil {
+		f.forgetLease(sessionID)
 	}
 	return err
 }
 
 // HeartbeatLease refreshes the lease timestamp.
 func (f *FileStore) HeartbeatLease(sessionID string) error {
-	path := f.leasePath(sessionID)
-	return os.WriteFile(path, []byte(fmt.Sprintf("%d\n", time.Now().Unix())), 0o600)
+	path, err := f.leasePath(sessionID)
+	if err != nil {
+		return err
+	}
+	token := f.leaseToken(sessionID)
+	if token == "" {
+		return fmt.Errorf("kite: session %s lease is not owned", sessionID)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	var stamp int64
+	var current string
+	if _, err := fmt.Sscanf(string(data), "%d %s", &stamp, &current); err != nil || current != token {
+		return fmt.Errorf("kite: session %s lease is not owned", sessionID)
+	}
+	return os.WriteFile(path, []byte(fmt.Sprintf("%d %s\n", time.Now().Unix(), token)), 0o600)
+}
+
+func (f *FileStore) rememberLease(sessionID, token string) {
+	f.leaseMu.Lock()
+	defer f.leaseMu.Unlock()
+	if f.leaseTokens == nil {
+		f.leaseTokens = make(map[string]string)
+	}
+	f.leaseTokens[sessionID] = token
+}
+
+func (f *FileStore) leaseToken(sessionID string) string {
+	f.leaseMu.Lock()
+	defer f.leaseMu.Unlock()
+	return f.leaseTokens[sessionID]
+}
+
+func (f *FileStore) forgetLease(sessionID string) {
+	f.leaseMu.Lock()
+	defer f.leaseMu.Unlock()
+	delete(f.leaseTokens, sessionID)
+}
+
+// LoadArtifactByID finds a globally unique artifact and reads a bounded range.
+func (f *FileStore) LoadArtifactByID(artifactID string, offset, limit int64) ([]byte, error) {
+	if err := validateID(artifactID, "art"); err != nil {
+		return nil, err
+	}
+	entries, err := os.ReadDir(filepath.Join(f.dir, "artifacts"))
+	if err != nil {
+		return nil, err
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() || validateID(entry.Name(), "sess") != nil {
+			continue
+		}
+		data, err := f.LoadArtifact(entry.Name(), artifactID, offset, limit)
+		if err == nil {
+			return data, nil
+		}
+		if !os.IsNotExist(err) {
+			return nil, err
+		}
+	}
+	return nil, fmt.Errorf("kite: artifact %s not found", artifactID)
+}
+
+func validateID(id, prefix string) error {
+	if !strings.HasPrefix(id, prefix+"_") || len(id) != len(prefix)+1+24 {
+		return fmt.Errorf("kite: invalid %s id", prefix)
+	}
+	for _, c := range id[len(prefix)+1:] {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return fmt.Errorf("kite: invalid %s id", prefix)
+		}
+	}
+	return nil
 }

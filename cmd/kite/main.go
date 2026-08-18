@@ -121,7 +121,6 @@ func sessionConfig(p *openai.Provider, workingDir string, print bool) core.Confi
 		Model:      p.Model,
 		WorkingDir: workingDir,
 		DataDir:    envOr("KITE_DATA_DIR", ""),
-		Tools:      (&tools.Set{Dir: workingDir}).All(),
 		Stdout:     os.Stdout,
 		Print:      print,
 		MaxTurns:   50,
@@ -147,6 +146,9 @@ func runPrompt(ctx context.Context, sess *core.Session, prompt string, print boo
 		case core.EventSessionFailed:
 			failed = ev.Payload.(*core.SessionFailedPayload).Error
 		}
+	}
+	if result == nil && failed == nil {
+		failed = &core.Error{Code: "runtime", Message: "session ended without a durable result"}
 	}
 	return result, failed
 }
@@ -204,6 +206,9 @@ func cmdRun(args []string) int {
 		}
 		if result.Verification != nil {
 			fmt.Printf("verification: %s (exit %d)\n", result.Verification.Status, result.Verification.ExitCode)
+		}
+		if result.Status == "failed" {
+			return 1
 		}
 	}
 	return 0
@@ -265,6 +270,9 @@ func cmdResume(args []string) int {
 	}
 	if result != nil {
 		fmt.Printf("\n--- result ---\nstatus: %s\n", result.Status)
+		if result.Status == "failed" {
+			return 1
+		}
 	}
 	return 0
 }
@@ -324,10 +332,20 @@ func (h *rpcHandler) Handle(req *rpc.Request) (*rpc.Response, error) {
 			return rpcErr(req, "busy", err.Error()), nil
 		}
 		var result *core.Result
+		var failed *core.Error
 		for ev := range ch {
-			if ev.Type == core.EventSessionCompleted {
+			switch ev.Type {
+			case core.EventSessionCompleted:
 				result = ev.Payload.(*core.SessionCompletedPayload).Result
+			case core.EventSessionFailed:
+				failed = ev.Payload.(*core.SessionFailedPayload).Error
 			}
+		}
+		if failed != nil {
+			return rpcErr(req, failed.Code, failed.Message), nil
+		}
+		if result == nil {
+			return rpcErr(req, "runtime", "session ended without a durable result"), nil
 		}
 		out, err := json.Marshal(result)
 		if err != nil {
@@ -336,9 +354,27 @@ func (h *rpcHandler) Handle(req *rpc.Request) (*rpc.Response, error) {
 		resp.Result = out
 		return resp, nil
 	case rpc.MethodStatus:
+		var p rpc.StatusParams
+		if len(req.Params) > 0 {
+			if err := json.Unmarshal(req.Params, &p); err != nil {
+				return rpcErr(req, "bad_params", "invalid params"), nil
+			}
+		}
 		store, err := core.OpenStore()
 		if err != nil {
 			return rpcErr(req, "store", err.Error()), nil
+		}
+		if p.SessionID != "" {
+			sess, err := core.LoadSession(sessionConfig(h.provider, h.dir, false), p.SessionID)
+			if err != nil {
+				return rpcErr(req, "session", err.Error()), nil
+			}
+			out, err := json.Marshal(&rpc.StatusResult{SessionID: sess.ID, Model: sess.Model, Turn: sess.Turn, Messages: len(sess.Messages), Interrupted: sess.Interrupted})
+			if err != nil {
+				return rpcErr(req, "encode", err.Error()), nil
+			}
+			resp.Result = out
+			return resp, nil
 		}
 		sessions, err := store.ListSessions()
 		if err != nil {
@@ -365,7 +401,11 @@ func (h *rpcHandler) Handle(req *rpc.Request) (*rpc.Response, error) {
 		if err := json.Unmarshal(req.Params, &p); err != nil {
 			return rpcErr(req, "bad_params", "invalid params"), nil
 		}
-		tool := (&tools.Set{Dir: h.dir}).Artifact()
+		store, err := core.OpenStore()
+		if err != nil {
+			return rpcErr(req, "store", err.Error()), nil
+		}
+		tool := (&tools.Set{Dir: h.dir, Store: store}).Artifact()
 		out, err := tool.Run(context.Background(), fmt.Sprintf(`{"id":%q,"offset":%d,"limit":%d}`, p.ArtifactID, p.Offset, p.Limit))
 		if err != nil {
 			return rpcErr(req, "artifact", err.Error()), nil
@@ -409,10 +449,20 @@ func (h *rpcHandler) Handle(req *rpc.Request) (*rpc.Response, error) {
 			return rpcErr(req, "busy", err.Error()), nil
 		}
 		var result *core.Result
+		var failed *core.Error
 		for ev := range ch {
-			if ev.Type == core.EventSessionCompleted {
+			switch ev.Type {
+			case core.EventSessionCompleted:
 				result = ev.Payload.(*core.SessionCompletedPayload).Result
+			case core.EventSessionFailed:
+				failed = ev.Payload.(*core.SessionFailedPayload).Error
 			}
+		}
+		if failed != nil {
+			return rpcErr(req, failed.Code, failed.Message), nil
+		}
+		if result == nil {
+			return rpcErr(req, "runtime", "session ended without a durable result"), nil
 		}
 		out, err := json.Marshal(result)
 		if err != nil {
@@ -507,7 +557,12 @@ func cmdArtifact(args []string) int {
 		fmt.Fprintln(os.Stderr, "kite:", err)
 		return 1
 	}
-	tool := (&tools.Set{Dir: dir}).Artifact()
+	store, err := core.OpenStore()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "kite:", err)
+		return 1
+	}
+	tool := (&tools.Set{Dir: dir, Store: store}).Artifact()
 	out, err := tool.Run(context.Background(), fmt.Sprintf(`{"id":%q,"offset":%d,"limit":%d}`, rest[0], *offset, *limit))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "kite:", err)

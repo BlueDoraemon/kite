@@ -14,6 +14,7 @@ import (
 	"context"
 
 	"github.com/BlueDoraemon/kite-core/internal/core"
+	_ "github.com/BlueDoraemon/kite-core/internal/tools"
 )
 
 // Role identifies who produced a message.

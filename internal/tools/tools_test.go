@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/BlueDoraemon/kite-core/internal/core"
 )
 
 func TestReadFileShowsLineNumbers(t *testing.T) {
@@ -41,6 +43,21 @@ func TestReadLineRange(t *testing.T) {
 	}
 	if strings.Contains(out, "one") || strings.Contains(out, "four") {
 		t.Fatalf("range output includes out-of-range lines: %q", out)
+	}
+}
+
+func TestReadLargeFileReturnsContentForArtifactBoundary(t *testing.T) {
+	dir := t.TempDir()
+	content := strings.Repeat("large-content\n", 3000)
+	if err := os.WriteFile(filepath.Join(dir, "large.txt"), []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out, err := (&Set{Dir: dir}).Read().Run(context.Background(), `{"path":"large.txt"}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "large-content") || len(out) < len(content) {
+		t.Fatalf("large read content was discarded: %d bytes", len(out))
 	}
 }
 
@@ -157,18 +174,20 @@ func TestBashWorkingDir(t *testing.T) {
 
 func TestArtifactPaging(t *testing.T) {
 	dir := t.TempDir()
-	// Store a large artifact directly.
 	dataDir := filepath.Join(dir, "data")
-	if err := os.MkdirAll(filepath.Join(dataDir, "artifacts", "s1"), 0o755); err != nil {
+	t.Setenv("KITE_DATA_DIR", dataDir)
+	store, err := core.OpenStore()
+	if err != nil {
 		t.Fatal(err)
 	}
 	content := strings.Repeat("x", 100)
-	if err := os.WriteFile(filepath.Join(dataDir, "artifacts", "s1", "a1"), []byte(content), 0o644); err != nil {
+	sessionID := "sess_000000000000000000000001"
+	artifactID := "art_000000000000000000000001"
+	if err := store.StoreArtifact(sessionID, artifactID, []byte(content)); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("KITE_DATA_DIR", dataDir)
-	tool := (&Set{Dir: dir}).Artifact()
-	out, err := tool.Run(context.Background(), `{"id":"a1","offset":0,"limit":50}`)
+	tool := (&Set{Dir: dir, Store: store}).Artifact()
+	out, err := tool.Run(context.Background(), `{"id":"art_000000000000000000000001","offset":0,"limit":50}`)
 	if err != nil {
 		t.Fatalf("artifact failed: %v", err)
 	}

@@ -118,29 +118,29 @@ func (e *Error) Error() string { return e.Code + ": " + e.Message }
 // Result is the structured outcome of a completed prompt.
 type Result struct {
 	// Status is "completed" or "failed".
-	Status string
+	Status string `json:"status"`
 	// Text is the final assistant text.
-	Text string
+	Text string `json:"text,omitempty"`
 	// ChangedFiles lists files modified during the run.
-	ChangedFiles []string
+	ChangedFiles []string `json:"changed_files,omitempty"`
 	// ChangedFilesComplete is false outside a Git repository, where the
 	// changed-files list may be incomplete.
-	ChangedFilesComplete bool
+	ChangedFilesComplete bool `json:"changed_files_complete"`
 	// Verification describes the last verification run, if any.
-	Verification *Verification
+	Verification *Verification `json:"verification,omitempty"`
 	// Usage aggregates token usage across all model turns.
-	Usage Usage
+	Usage Usage `json:"usage"`
 }
 
 // Verification describes a bash verification run.
 type Verification struct {
-	Command  string
-	Status   string // "passed" or "failed"
-	ExitCode int
+	Command  string `json:"command"`
+	Status   string `json:"status"` // "passed" or "failed"
+	ExitCode int    `json:"exit_code"`
 	// Artifacts holds artifact IDs produced by the verification command.
-	Artifacts []string
+	Artifacts []string `json:"artifacts,omitempty"`
 	// Stale is true when the worktree changed after this verification ran.
-	Stale bool
+	Stale bool `json:"stale"`
 }
 
 // Event is a durable, sequence-numbered unit emitted by the agent loop.

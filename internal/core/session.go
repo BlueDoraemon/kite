@@ -14,18 +14,21 @@ import (
 type Session struct {
 	mu sync.Mutex
 
-	ID       string
-	Model    string
-	Messages []Message
-	StartedAt time.Time
-	Turn     int
+	ID          string
+	Model       string
+	Messages    []Message
+	StartedAt   time.Time
+	Turn        int
 	Interrupted []ToolCall
 
 	cfg    Config
 	store  SessionStore
 	events []*Event
 
-	active bool
+	active             bool
+	latestVerification *Verification
+	pendingInterrupts  []ToolCall
+	persistenceErr     error
 }
 
 // NewSession creates a new session from cfg. Setup errors (nil provider,
@@ -44,12 +47,12 @@ func NewSession(cfg Config) (*Session, error) {
 	if cfg.MaxPreview == 0 {
 		cfg.MaxPreview = 8 * 1024
 	}
-	if cfg.Tools == nil {
-		cfg.Tools = builtinTools(cfg.WorkingDir)
-	}
 	store, err := openStore(cfg.DataDir)
 	if err != nil {
 		return nil, err
+	}
+	if cfg.Tools == nil {
+		cfg.Tools = builtinTools(cfg.WorkingDir, store)
 	}
 	s := &Session{
 		ID:        newID("sess"),
@@ -64,8 +67,8 @@ func NewSession(cfg Config) (*Session, error) {
 // LoadSession loads a persisted session by id. The session is reconstructed
 // from its durable event log, so it can be resumed exactly where it left off.
 func LoadSession(cfg Config, id string) (*Session, error) {
-	if id == "" {
-		return nil, fmt.Errorf("kite: empty session id")
+	if err := validateID(id, "sess"); err != nil {
+		return nil, err
 	}
 	if cfg.MaxInline == 0 {
 		cfg.MaxInline = 16 * 1024
@@ -73,12 +76,12 @@ func LoadSession(cfg Config, id string) (*Session, error) {
 	if cfg.MaxPreview == 0 {
 		cfg.MaxPreview = 8 * 1024
 	}
-	if cfg.Tools == nil {
-		cfg.Tools = builtinTools(cfg.WorkingDir)
-	}
 	store, err := openStore(cfg.DataDir)
 	if err != nil {
 		return nil, err
+	}
+	if cfg.Tools == nil {
+		cfg.Tools = builtinTools(cfg.WorkingDir, store)
 	}
 	evs, err := store.LoadEvents(id)
 	if err != nil {
@@ -90,6 +93,7 @@ func LoadSession(cfg Config, id string) (*Session, error) {
 		cfg:   cfg,
 		store: store,
 	}
+	s.events = evs
 	replaySession(s, evs)
 	return s, nil
 }
@@ -98,6 +102,8 @@ func LoadSession(cfg Config, id string) (*Session, error) {
 // event log. Only complete durable turns are replayed; interrupted tool
 // calls are recorded and never re-run.
 func replaySession(s *Session, evs []*Event) {
+	pending := make(map[string]ToolCall)
+	pendingOrder := make([]string, 0)
 	for _, ev := range evs {
 		switch ev.Type {
 		case EventSessionStarted:
@@ -116,10 +122,15 @@ func replaySession(s *Session, evs []*Event) {
 			}
 		case EventToolStarted:
 			if p, ok := ev.Payload.(*ToolStartedPayload); ok {
-				// Mark the assistant message as carrying this call.
-				if n := len(s.Messages); n > 0 && s.Messages[n-1].Role == RoleAssistant {
-					s.Messages[n-1].ToolCalls = append(s.Messages[n-1].ToolCalls, ToolCall{ID: p.CallID, Name: p.Name, Input: p.Input})
+				call := ToolCall{ID: p.CallID, Name: p.Name, Input: p.Input}
+				n := len(s.Messages)
+				if n == 0 || s.Messages[n-1].Role != RoleAssistant {
+					s.Messages = append(s.Messages, Message{Role: RoleAssistant})
+					n++
 				}
+				s.Messages[n-1].ToolCalls = append(s.Messages[n-1].ToolCalls, call)
+				pending[p.CallID] = call
+				pendingOrder = append(pendingOrder, p.CallID)
 			}
 		case EventToolFinished:
 			if p, ok := ev.Payload.(*ToolFinishedPayload); ok {
@@ -128,6 +139,7 @@ func replaySession(s *Session, evs []*Event) {
 					content = "error: " + p.Error.Message
 				}
 				s.Messages = append(s.Messages, Message{Role: RoleTool, ToolCallID: p.CallID, Content: content})
+				delete(pending, p.CallID)
 			}
 		case EventModelCompleted:
 			if p, ok := ev.Payload.(*ModelCompletedPayload); ok {
@@ -136,7 +148,20 @@ func replaySession(s *Session, evs []*Event) {
 		case EventInterruptedTool:
 			if p, ok := ev.Payload.(*InterruptedToolPayload); ok && p.Call != nil {
 				s.Interrupted = append(s.Interrupted, *p.Call)
+				delete(pending, p.Call.ID)
 			}
+		case EventVerification:
+			if p, ok := ev.Payload.(*VerificationPayload); ok && p.Verification != nil {
+				copy := *p.Verification
+				s.latestVerification = &copy
+			}
+		}
+	}
+	for _, id := range pendingOrder {
+		if call, ok := pending[id]; ok {
+			s.Interrupted = append(s.Interrupted, call)
+			s.pendingInterrupts = append(s.pendingInterrupts, call)
+			s.Messages = append(s.Messages, Message{Role: RoleTool, ToolCallID: call.ID, Content: "error: tool call was interrupted and was not replayed"})
 		}
 	}
 }
@@ -151,13 +176,49 @@ func (s *Session) Prompt(ctx context.Context, text string) (<-chan Event, error)
 	if s.active {
 		return nil, fmt.Errorf("kite: a prompt is already active on this session")
 	}
+	if s.persistenceErr != nil {
+		return nil, fmt.Errorf("kite: session persistence failed; reload the session before prompting again")
+	}
+	lease, ok := s.store.(interface {
+		AcquireLease(string, time.Duration) error
+		HeartbeatLease(string) error
+		ReleaseLease(string) error
+	})
+	if ok {
+		if err := lease.AcquireLease(s.ID, 5*time.Minute); err != nil {
+			return nil, err
+		}
+	}
 	s.active = true
 
 	ch := make(chan Event, 64)
 	go func() {
-		defer func() { s.mu.Lock(); s.active = false; s.mu.Unlock() }()
+		defer close(ch)
+		stopHeartbeat := make(chan struct{})
+		if ok {
+			go func() {
+				ticker := time.NewTicker(time.Minute)
+				defer ticker.Stop()
+				for {
+					select {
+					case <-ticker.C:
+						_ = lease.HeartbeatLease(s.ID)
+					case <-stopHeartbeat:
+						return
+					}
+				}
+			}()
+		}
+		defer func() {
+			if ok {
+				close(stopHeartbeat)
+				_ = lease.ReleaseLease(s.ID)
+			}
+			s.mu.Lock()
+			s.active = false
+			s.mu.Unlock()
+		}()
 		s.run(ctx, text, ch)
-		close(ch)
 	}()
 	return ch, nil
 }
@@ -182,7 +243,7 @@ func newID(prefix string) string {
 	if _, err := rand.Read(b[:]); err != nil {
 		// Fall back to a time-based id; rand failure is essentially
 		// impossible on supported platforms.
-		return fmt.Sprintf("%s-%d", prefix, time.Now().UnixNano())
+		return fmt.Sprintf("%s_%024x", prefix, time.Now().UnixNano())
 	}
 	return prefix + "_" + hex.EncodeToString(b[:])
 }

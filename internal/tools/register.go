@@ -5,8 +5,8 @@ import (
 )
 
 func init() {
-	core.RegisterBuiltins(func(dir string) []core.Tool {
-		set := &Set{Dir: dir}
+	core.RegisterBuiltins(func(dir string, store core.SessionStore) []core.Tool {
+		set := &Set{Dir: dir, Store: store}
 		return set.All()
 	})
 }

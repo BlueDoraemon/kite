@@ -106,4 +106,7 @@ func TestIntegrationBashFailReadEditVerifyPass(t *testing.T) {
 	if last.Status != "passed" {
 		t.Fatalf("last verification = %+v, want passed", last)
 	}
+	if result.Verification == nil || result.Verification.Status != "passed" || result.Verification.Stale {
+		t.Fatalf("result verification = %+v, want current pass", result.Verification)
+	}
 }
