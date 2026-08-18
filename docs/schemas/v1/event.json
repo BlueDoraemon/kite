@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Kite Event",
+  "version": "kite.event/v1",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "payload": {
+      "type": "object"
+    },
+    "seq": {
+      "type": "integer"
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "time": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "type": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "seq",
+    "session_id",
+    "type",
+    "time"
+  ]
+}

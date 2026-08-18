@@ -7,12 +7,11 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"unicode/utf8"
 
-	"github.com/BlueDoraemon/kite-core/internal/kite"
+	"github.com/BlueDoraemon/kite-core/internal/core"
 )
 
-// stubTool is a minimal kite.Tool used to verify tool advertisement.
+// stubTool is a minimal core.Tool used to verify tool advertisement.
 type stubTool struct{}
 
 func (stubTool) Name() string        { return "my_tool" }
@@ -22,72 +21,108 @@ func (stubTool) Schema() any {
 }
 func (stubTool) Run(context.Context, string) (string, error) { return "", nil }
 
-func TestCompleteSendsMessagesAndTools(t *testing.T) {
-	var gotBody map[string]any
+func newSession() *core.Session {
+	return &core.Session{ID: "s1", Model: "m"}
+}
+
+func TestCompleteStreamsTextAndUsage(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer key" {
-			t.Fatalf("authorization = %q, want Bearer key", r.Header.Get("Authorization"))
+			t.Errorf("authorization = %q", r.Header.Get("Authorization"))
 		}
-		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
-			t.Fatalf("decode request body: %v", err)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"hi"}}]}`))
+		w.Header().Set("Content-Type", "text/event-stream")
+		write := func(s string) { w.Write([]byte(s + "\n\n")) }
+		write(`data: {"choices":[{"delta":{"content":"hel"}}]}`)
+		write(`data: {"choices":[{"delta":{"content":"lo"}}]}`)
+		write(`data: {"choices":[{"delta":{"content":""}}],"usage":{"prompt_tokens":3,"completion_tokens":2,"total_tokens":5}}`)
+		write("data: [DONE]")
 	}))
 	defer srv.Close()
 
 	p := New(srv.URL, "key", "model-1")
-	msg := []kite.Message{{Role: kite.RoleUser, Content: "hello"}}
-	reply, err := p.Complete(context.Background(), &kite.Session{Model: "model-1", Messages: msg}, []kite.Tool{stubTool{}})
+	var text strings.Builder
+	var usage *core.Usage
+	done := false
+	err := p.Complete(context.Background(), newSession(), []core.Tool{stubTool{}}, func(pe core.ProviderEvent) {
+		text.WriteString(pe.Text)
+		if pe.Usage != nil {
+			usage = pe.Usage
+		}
+		if pe.Done {
+			done = true
+		}
+	})
 	if err != nil {
 		t.Fatalf("complete failed: %v", err)
 	}
-	if reply.Text != "hi" {
-		t.Fatalf("reply text = %q, want %q", reply.Text, "hi")
+	if text.String() != "hello" {
+		t.Fatalf("text = %q, want hello", text.String())
 	}
-
-	if gotBody["model"] != "model-1" {
-		t.Fatalf("model in request = %v, want model-1", gotBody["model"])
+	if usage == nil || usage.TotalTokens != 5 {
+		t.Fatalf("usage = %+v, want total 5", usage)
 	}
-	tools, ok := gotBody["tools"].([]any)
-	if !ok || len(tools) != 1 {
-		t.Fatalf("tools in request = %v, want one tool", gotBody["tools"])
-	}
-	fn, ok := tools[0].(map[string]any)["function"].(map[string]any)
-	if !ok {
-		t.Fatalf("tools[0].function missing: %v", tools[0])
-	}
-	if fn["name"] != "my_tool" {
-		t.Fatalf("function name = %v, want my_tool", fn["name"])
+	if !done {
+		t.Fatal("done not emitted")
 	}
 }
 
-func TestCompleteParsesToolCalls(t *testing.T) {
+func TestCompleteFragmentedToolCall(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"choices":[{"message":{
-			"role":"assistant",
-			"content":"",
-			"tool_calls":[{"id":"c1","type":"function","function":{"name":"read","arguments":"{\"path\":\"go.mod\"}"}}]
-		}}]}`))
+		w.Header().Set("Content-Type", "text/event-stream")
+		write := func(s string) { w.Write([]byte(s + "\n\n")) }
+		// The tool call arrives in fragments.
+		write(`data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","function":{"name":"read","arguments":"{\"pa"}}]}}]}`)
+		write(`data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"th\":\"go.mod\"}"}}]}}]}`)
+		write("data: [DONE]")
 	}))
 	defer srv.Close()
 
 	p := New(srv.URL, "", "m")
-	reply, err := p.Complete(context.Background(), &kite.Session{Model: "m"}, nil)
+	var calls []core.ToolCall
+	err := p.Complete(context.Background(), newSession(), nil, func(pe core.ProviderEvent) {
+		if pe.ToolCall != nil {
+			calls = append(calls, *pe.ToolCall)
+		}
+	})
 	if err != nil {
 		t.Fatalf("complete failed: %v", err)
 	}
-	if len(reply.ToolCalls) != 1 {
-		t.Fatalf("tool calls = %d, want 1", len(reply.ToolCalls))
+	if len(calls) != 1 {
+		t.Fatalf("calls = %d, want 1", len(calls))
 	}
-	tc := reply.ToolCalls[0]
-	if tc.ID != "c1" || tc.Name != "read" || !strings.Contains(tc.Input, "go.mod") {
-		t.Fatalf("tool call = %+v", tc)
+	if calls[0].Name != "read" || !strings.Contains(calls[0].Input, "go.mod") {
+		t.Fatalf("call = %+v", calls[0])
 	}
 }
 
-func TestCompleteReportsNon200(t *testing.T) {
+func TestCompleteMalformedSSE(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Write([]byte("data: {not json}\n\n"))
+	}))
+	defer srv.Close()
+
+	p := New(srv.URL, "", "m")
+	err := p.Complete(context.Background(), newSession(), nil, func(core.ProviderEvent) {})
+	if err == nil {
+		t.Fatal("expected error for malformed SSE")
+	}
+	var ke *core.Error
+	if !asCoreError(err, &ke) || ke.Code != "malformed_sse" {
+		t.Fatalf("error = %v, want malformed_sse", err)
+	}
+}
+
+func asCoreError(err error, target **core.Error) bool {
+	e, ok := err.(*core.Error)
+	if !ok {
+		return false
+	}
+	*target = e
+	return true
+}
+
+func TestCompleteNon200(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		w.Write([]byte(`{"error":"bad key"}`))
@@ -95,88 +130,55 @@ func TestCompleteReportsNon200(t *testing.T) {
 	defer srv.Close()
 
 	p := New(srv.URL, "x", "m")
-	_, err := p.Complete(context.Background(), &kite.Session{Model: "m"}, nil)
-	if err == nil || !strings.Contains(err.Error(), "401") {
-		t.Fatalf("expected 401 error, got %v", err)
-	}
-}
-
-func TestCompleteNoChoicesErrors(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"choices":[]}`))
-	}))
-	defer srv.Close()
-
-	p := New(srv.URL, "", "m")
-	_, err := p.Complete(context.Background(), &kite.Session{Model: "m"}, nil)
+	err := p.Complete(context.Background(), newSession(), nil, func(core.ProviderEvent) {})
 	if err == nil {
-		t.Fatal("expected error for empty choices")
+		t.Fatal("expected 401 error")
+	}
+	if !strings.Contains(err.Error(), "401") {
+		t.Fatalf("error = %v, want 401", err)
 	}
 }
 
-func TestCompleteRetriesOn503(t *testing.T) {
-	var calls int
+func TestCompleteCancellation(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls++
-		if calls < 3 {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			w.Write([]byte(`{"error":"busy"}`))
-			return
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"x\"}}]}\n\n"))
+		// Hold the connection open.
+		<-r.Context().Done()
+	}))
+	defer srv.Close()
+
+	p := New(srv.URL, "", "m")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := p.Complete(ctx, newSession(), nil, func(core.ProviderEvent) {})
+	if err == nil {
+		t.Fatal("expected cancellation error")
+	}
+}
+
+func TestBuildRequestSendsToolsAndStream(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		json.NewDecoder(r.Body).Decode(&body)
+		if body["stream"] != true {
+			t.Errorf("stream = %v, want true", body["stream"])
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"ok"}}]}`))
+		if body["model"] != "model-1" {
+			t.Errorf("model = %v", body["model"])
+		}
+		tools, _ := body["tools"].([]any)
+		if len(tools) != 1 {
+			t.Errorf("tools = %v, want 1", tools)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Write([]byte("data: [DONE]\nn"))
 	}))
 	defer srv.Close()
 
-	p := New(srv.URL, "", "m")
-	p.MaxRetries = 3
-	reply, err := p.Complete(context.Background(), &kite.Session{Model: "m"}, nil)
+	p := New(srv.URL, "", "model-1")
+	err := p.Complete(context.Background(), newSession(), []core.Tool{stubTool{}}, func(core.ProviderEvent) {})
 	if err != nil {
-		t.Fatalf("complete failed after retries: %v", err)
-	}
-	if reply.Text != "ok" {
-		t.Fatalf("reply text = %q, want ok", reply.Text)
-	}
-	if calls != 3 {
-		t.Fatalf("server called %d times, want 3", calls)
-	}
-}
-
-func TestCompleteNoRetryOn400(t *testing.T) {
-	var calls int
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls++
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(`{"error":"bad"}`))
-	}))
-	defer srv.Close()
-
-	p := New(srv.URL, "", "m")
-	p.MaxRetries = 3
-	_, err := p.Complete(context.Background(), &kite.Session{Model: "m"}, nil)
-	if err == nil || !strings.Contains(err.Error(), "400") {
-		t.Fatalf("expected 400 error, got %v", err)
-	}
-	if calls != 1 {
-		t.Fatalf("server called %d times, want 1 (no retry on 400)", calls)
-	}
-}
-
-func TestTruncateKeepsUTF8Intact(t *testing.T) {
-	// A multibyte rune straddling the cut point must not be split.
-	s := "héllo wörld"
-	out := truncate(s, 6)
-	if !utf8.ValidString(out) {
-		t.Fatalf("truncate produced invalid UTF-8: %q", out)
-	}
-	if !strings.HasSuffix(out, "...") {
-		t.Fatalf("truncate output = %q, want ellipsis suffix", out)
-	}
-	if len(out) > 9 { // 6 bytes + "..."
-		t.Fatalf("truncate output too long: %q (%d bytes)", out, len(out))
-	}
-	if truncate("short", 100) != "short" {
-		t.Fatal("truncate should return short strings unchanged")
+		t.Fatalf("complete failed: %v", err)
 	}
 }

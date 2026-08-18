@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Kite Result",
+  "version": "kite.result/v1",
+  "type": "object",
+  "properties": {
+    "changed_files": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "changed_files_complete": {
+      "type": "boolean"
+    },
+    "status": {
+      "enum": [
+        "completed",
+        "failed"
+      ],
+      "type": "string"
+    },
+    "text": {
+      "type": "string"
+    },
+    "usage": {
+      "properties": {
+        "completion_tokens": {
+          "type": "integer"
+        },
+        "prompt_tokens": {
+          "type": "integer"
+        },
+        "total_tokens": {
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "verification": {
+      "properties": {
+        "artifacts": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "command": {
+          "type": "string"
+        },
+        "exit_code": {
+          "type": "integer"
+        },
+        "stale": {
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "failed"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "required": [
+    "status"
+  ]
+}

@@ -1,5 +1,5 @@
 // Package tools implements the built-in repository tools that the agent can
-// call: read, edit, and bash. They operate on a working directory.
+// call: read, edit, bash, and artifact. They operate on a working directory.
 package tools
 
 import (
@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/BlueDoraemon/kite-core/internal/kite"
+	"github.com/BlueDoraemon/kite-core/internal/core"
 )
 
-// Tool is a named function the model can call. It implements kite.Tool.
+// Tool is a named function the model can call. It implements core.Tool.
 type Tool struct {
 	name        string
 	description string
@@ -93,6 +93,7 @@ func parseInput(input string, specs []argSpec) (map[string]any, error) {
 }
 
 func str(m map[string]any, k string) string { v, _ := m[k].(string); return v }
+func intv(m map[string]any, k string) int   { v, _ := m[k].(int); return v }
 func boolv(m map[string]any, k string) bool { v, _ := m[k].(bool); return v }
 
 // Set holds the tools that work against a working directory.
@@ -100,14 +101,18 @@ type Set struct {
 	Dir string
 }
 
-// All returns the read, edit, and bash tools.
-func (s *Set) All() []kite.Tool {
-	return []kite.Tool{s.Read(), s.Edit(), s.Bash()}
+// All returns the read, edit, bash, and artifact tools as core.Tool values.
+func (s *Set) All() []core.Tool {
+	return []core.Tool{s.Read(), s.Edit(), s.Bash(), s.Artifact()}
 }
 
 // resolve returns the absolute path for a repository-relative path, safe
-// against attempts to escape the working directory.
+// against attempts to escape the working directory. It follows symlinks and
+// verifies the resolved target stays inside the working directory.
 func (s *Set) resolve(path string) (string, error) {
+	if path == "" {
+		return "", fmt.Errorf("empty path")
+	}
 	abs, err := filepath.Abs(filepath.Join(s.Dir, path))
 	if err != nil {
 		return "", err
@@ -116,12 +121,28 @@ func (s *Set) resolve(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	rel, err := filepath.Rel(root, abs)
+	// Resolve both the target and the root so a symlinked working directory
+	// (for example /var -> /private/var on macOS) does not cause a false
+	// containment failure.
+	resolved, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		// The file may not exist yet (edit of a new file); fall back to
+		// resolving the parent.
+		resolved = abs
+		if parent, perr := filepath.EvalSymlinks(filepath.Dir(abs)); perr == nil {
+			resolved = filepath.Join(parent, filepath.Base(abs))
+		}
+	}
+	resolvedRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		resolvedRoot = root
+	}
+	rel, err := filepath.Rel(resolvedRoot, resolved)
 	if err != nil {
 		return "", err
 	}
 	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 		return "", fmt.Errorf("path %q is outside the working directory", path)
 	}
-	return abs, nil
+	return resolved, nil
 }

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Kite RPC Request",
+  "version": "kite.rpc.request/v1",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "method": {
+      "type": "string"
+    },
+    "params": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "id",
+    "method"
+  ]
+}

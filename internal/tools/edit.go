@@ -9,10 +9,11 @@ import (
 )
 
 // Edit returns a Tool that replaces an exact block of text in a file.
+// Writes are atomic and preserve file permissions.
 func (s *Set) Edit() *Tool {
 	return &Tool{
 		name:        "edit",
-		description: "Replace an exact block of text in a file within the repository. The old_text must match exactly, including whitespace.",
+		description: "Replace an exact block of text in a file within the repository. The old_text must match exactly, including whitespace. Writes are atomic.",
 		specs: []argSpec{
 			{name: "path", typ: "string", desc: "Repository-relative path to the file.", required: true},
 			{name: "old_text", typ: "string", desc: "Exact text to find and replace.", required: true},

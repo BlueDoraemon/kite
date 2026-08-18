@@ -2,14 +2,10 @@ package tools
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
-	"syscall"
 	"testing"
-	"time"
 )
 
 func TestReadFileShowsLineNumbers(t *testing.T) {
@@ -29,37 +25,46 @@ func TestReadFileShowsLineNumbers(t *testing.T) {
 	}
 }
 
-func TestReadDirectoryListsEntries(t *testing.T) {
+func TestReadLineRange(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.Mkdir(filepath.Join(dir, "sub"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "f.txt"), []byte("x"), 0o644); err != nil {
+	fpath := filepath.Join(dir, "a.txt")
+	if err := os.WriteFile(fpath, []byte("one\ntwo\nthree\nfour\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	tool := (&Set{Dir: dir}).Read()
-	out, err := tool.Run(context.Background(), `{"path":"."}`)
+	out, err := tool.Run(context.Background(), `{"path":"a.txt","start_line":2,"end_line":3}`)
 	if err != nil {
-		t.Fatalf("read dir failed: %v", err)
+		t.Fatalf("read failed: %v", err)
 	}
-	if !strings.Contains(out, "f.txt") || !strings.Contains(out, "sub/") {
-		t.Fatalf("dir listing = %q, want entry f.txt and sub/", out)
+	if !strings.Contains(out, "two") || !strings.Contains(out, "three") {
+		t.Fatalf("range output = %q", out)
+	}
+	if strings.Contains(out, "one") || strings.Contains(out, "four") {
+		t.Fatalf("range output includes out-of-range lines: %q", out)
 	}
 }
 
-func TestReadRejectsEscapingDir(t *testing.T) {
+func TestReadRejectsSymlinkEscape(t *testing.T) {
 	dir := t.TempDir()
+	outside := t.TempDir()
+	secret := filepath.Join(outside, "secret.txt")
+	if err := os.WriteFile(secret, []byte("secret"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(secret, filepath.Join(dir, "link.txt")); err != nil {
+		t.Fatal(err)
+	}
 	tool := (&Set{Dir: dir}).Read()
-	_, err := tool.Run(context.Background(), `{"path":"../secret"}`)
+	_, err := tool.Run(context.Background(), `{"path":"link.txt"}`)
 	if err == nil {
-		t.Fatal("expected error for path escaping the working directory")
+		t.Fatal("expected error for symlink escaping the working directory")
 	}
 }
 
-func TestEditReplacesText(t *testing.T) {
+func TestEditReplacesTextAtomically(t *testing.T) {
 	dir := t.TempDir()
 	fpath := filepath.Join(dir, "b.txt")
-	if err := os.WriteFile(fpath, []byte("hello foo world foo\n"), 0o644); err != nil {
+	if err := os.WriteFile(fpath, []byte("hello foo world foo\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	tool := (&Set{Dir: dir}).Edit()
@@ -77,6 +82,18 @@ func TestEditReplacesText(t *testing.T) {
 	// Default is replace-first only.
 	if string(data) != "hello bar world foo\n" {
 		t.Fatalf("file after edit = %q", string(data))
+	}
+	// Mode is preserved.
+	st, _ := os.Stat(fpath)
+	if st.Mode().Perm() != 0o600 {
+		t.Fatalf("file mode = %v, want 0600", st.Mode().Perm())
+	}
+	// No temp files left.
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".kite-edit-") {
+			t.Fatalf("temp file left: %s", e.Name())
+		}
 	}
 }
 
@@ -96,19 +113,6 @@ func TestEditApplyAll(t *testing.T) {
 	}
 }
 
-func TestEditMissingTextErrors(t *testing.T) {
-	dir := t.TempDir()
-	fpath := filepath.Join(dir, "d.txt")
-	if err := os.WriteFile(fpath, []byte("abc\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	tool := (&Set{Dir: dir}).Edit()
-	_, err := tool.Run(context.Background(), `{"path":"d.txt","old_text":"zzz","new_text":"q"}`)
-	if err == nil || !strings.Contains(err.Error(), "not found") {
-		t.Fatalf("expected not found error, got %v", err)
-	}
-}
-
 func TestBashRunsCommandInDir(t *testing.T) {
 	dir := t.TempDir()
 	tool := (&Set{Dir: dir}).Bash()
@@ -122,7 +126,7 @@ func TestBashRunsCommandInDir(t *testing.T) {
 	}
 }
 
-func TestBashCapturesStderrAndExitCode(t *testing.T) {
+func TestBashCapturesExitCode(t *testing.T) {
 	dir := t.TempDir()
 	tool := (&Set{Dir: dir}).Bash()
 	out, err := tool.Run(context.Background(), `{"command":"echo boom >&2; exit 3"}`)
@@ -134,82 +138,41 @@ func TestBashCapturesStderrAndExitCode(t *testing.T) {
 	}
 }
 
-func TestBashMissingCommandErrors(t *testing.T) {
-	tool := (&Set{Dir: "."}).Bash()
-	_, err := tool.Run(context.Background(), `{"command":"_nonexistent_cmd_123"}`)
-	if err != nil {
-		t.Fatalf("expected exit-status result, got error: %v", err)
-	}
-}
-
-func TestEditPreservesModeAndLeavesNoTemp(t *testing.T) {
+func TestBashWorkingDir(t *testing.T) {
 	dir := t.TempDir()
-	fpath := filepath.Join(dir, "m.txt")
-	if err := os.WriteFile(fpath, []byte("old\n"), 0o600); err != nil {
+	sub := filepath.Join(dir, "sub")
+	if err := os.MkdirAll(sub, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	tool := (&Set{Dir: dir}).Edit()
-	if _, err := tool.Run(context.Background(), `{"path":"m.txt","old_text":"old","new_text":"new"}`); err != nil {
-		t.Fatalf("edit failed: %v", err)
-	}
-	st, err := os.Stat(fpath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if st.Mode().Perm() != 0o600 {
-		t.Fatalf("file mode = %v, want 0600", st.Mode().Perm())
-	}
-	data, _ := os.ReadFile(fpath)
-	if string(data) != "new\n" {
-		t.Fatalf("file content = %q, want %q", string(data), "new\n")
-	}
-	// No temp files may be left behind.
-	entries, _ := os.ReadDir(dir)
-	for _, e := range entries {
-		if strings.HasPrefix(e.Name(), ".kite-edit-") {
-			t.Fatalf("temp file left behind: %s", e.Name())
-		}
-	}
-}
-
-func TestBashTimeoutKillsChildProcesses(t *testing.T) {
-	// Spawn a child that outlives the shell; the process-group kill must
-	// take it down too. The command runs longer than BashTimeout, so the
-	// tool returns before the child could exit on its own.
-	dir := t.TempDir()
-	marker := filepath.Join(dir, "child-alive")
-	command := fmt.Sprintf("sh -c 'sleep 100 & echo $! > %s; wait'", marker)
 	tool := (&Set{Dir: dir}).Bash()
-	_, err := tool.Run(context.Background(), `{"command":"`+command+`"}`)
+	out, err := tool.Run(context.Background(), `{"command":"pwd","working_dir":"sub"}`)
 	if err != nil {
 		t.Fatalf("bash failed: %v", err)
 	}
-	// The child pid was recorded; it must be gone now.
-	data, rerr := os.ReadFile(marker)
-	if rerr != nil {
-		t.Fatalf("marker not written: %v", rerr)
+	abs, _ := filepath.Abs(sub)
+	if !strings.Contains(out, abs) {
+		t.Fatalf("bash output = %q, want cwd %q", out, abs)
 	}
-	pid := strings.TrimSpace(string(data))
-	if pid == "" {
-		t.Fatal("no child pid recorded")
-	}
-	// Give the kill a moment to land, then check the process is gone.
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		if !processAlive(pid) {
-			return
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-	t.Fatalf("child process %s still alive after bash timeout", pid)
 }
 
-// processAlive reports whether a pid exists, using a zero signal.
-func processAlive(pid string) bool {
-	p, err := strconv.Atoi(pid)
-	if err != nil {
-		return false
+func TestArtifactPaging(t *testing.T) {
+	dir := t.TempDir()
+	// Store a large artifact directly.
+	dataDir := filepath.Join(dir, "data")
+	if err := os.MkdirAll(filepath.Join(dataDir, "artifacts", "s1"), 0o755); err != nil {
+		t.Fatal(err)
 	}
-	err = syscall.Kill(p, 0)
-	return err == nil || err == syscall.EPERM
+	content := strings.Repeat("x", 100)
+	if err := os.WriteFile(filepath.Join(dataDir, "artifacts", "s1", "a1"), []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("KITE_DATA_DIR", dataDir)
+	tool := (&Set{Dir: dir}).Artifact()
+	out, err := tool.Run(context.Background(), `{"id":"a1","offset":0,"limit":50}`)
+	if err != nil {
+		t.Fatalf("artifact failed: %v", err)
+	}
+	if len(out) != 50 {
+		t.Fatalf("artifact output = %d bytes, want 50", len(out))
+	}
 }

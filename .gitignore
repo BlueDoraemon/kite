@@ -1,2 +1,6 @@
 /kite
 *.test
+/go-session
+examples/agents/*/custom-tool
+examples/agents/*/go-session
+examples/agents/*/rpc-client
