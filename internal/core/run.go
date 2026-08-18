@@ -144,14 +144,6 @@ func (s *Session) run(ctx context.Context, text string, ch chan<- Event) {
 				recordChangedFiles(changed, s.cfg.WorkingDir, call.Name, call.Input)
 			}
 
-			// Close the tool hunk before emitting any derived verification
-			// status. Consumers can then render verification as a seal over a
-			// completed tool result rather than as activity inside the tool.
-			if err := s.emit(ch, EventToolFinished, &ToolFinishedPayload{CallID: call.ID, Name: call.Name, Output: output, Error: runErr}); err != nil {
-				return
-			}
-			s.Messages = append(s.Messages, Message{Role: RoleTool, ToolCallID: call.ID, Content: output})
-
 			// Verification purpose: record verification status. The bash
 			// tool reports a non-zero exit as a string result with a nil
 			// error, so the status is parsed from the output.
@@ -182,6 +174,11 @@ func (s *Session) run(ctx context.Context, text string, ch chan<- Event) {
 					return
 				}
 			}
+
+			if err := s.emit(ch, EventToolFinished, &ToolFinishedPayload{CallID: call.ID, Name: call.Name, Output: output, Error: runErr}); err != nil {
+				return
+			}
+			s.Messages = append(s.Messages, Message{Role: RoleTool, ToolCallID: call.ID, Content: output})
 		}
 	}
 }

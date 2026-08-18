@@ -123,7 +123,7 @@ func TestRunToolCallThenFinishes(t *testing.T) {
 	}
 }
 
-func TestVerificationSealsCompletedToolHunk(t *testing.T) {
+func TestVerificationPersistsBeforeToolCompletion(t *testing.T) {
 	p := &scriptProvider{turns: []turn{
 		{toolCalls: []ToolCall{{ID: "c1", Name: "bash", Input: `{"command":"go test ./...","purpose":"verification"}`}}},
 		{text: "done"},
@@ -146,7 +146,7 @@ func TestVerificationSealsCompletedToolHunk(t *testing.T) {
 			sequence = append(sequence, event.Type)
 		}
 	}
-	if got, want := strings.Join(sequence, ","), "tool.started,tool.finished,verification"; got != want {
+	if got, want := strings.Join(sequence, ","), "tool.started,verification,tool.finished"; got != want {
 		t.Fatalf("tool/verification event order = %s, want %s", got, want)
 	}
 }

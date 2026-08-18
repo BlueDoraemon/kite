@@ -53,19 +53,21 @@ type Config struct {
 
 // App is a line-oriented terminal workspace over one durable Kite session.
 type App struct {
-	session   Prompter
-	sessionID string
-	model     string
-	workDir   string
-	theme     Theme
-	in        io.Reader
-	out       io.Writer
-	context   func() []core.Message
-	color     bool
-	clear     bool
-	width     int
-	textOpen  bool
-	writeErr  error
+	session             Prompter
+	sessionID           string
+	model               string
+	workDir             string
+	theme               Theme
+	in                  io.Reader
+	out                 io.Writer
+	context             func() []core.Message
+	color               bool
+	clear               bool
+	width               int
+	textOpen            bool
+	toolOpen            bool
+	pendingVerification []core.Event
+	writeErr            error
 }
 
 type scanResult struct {
@@ -296,6 +298,7 @@ func (a *App) event(event core.Event) {
 		}
 	case core.EventToolStarted:
 		if payload, ok := event.Payload.(*core.ToolStartedPayload); ok {
+			a.toolOpen = true
 			a.line(prefix + a.mark("+ TOOL", a.theme.Accent, true) + " " + oneLine(payload.Name, 40))
 			a.preview("     | input ", payload.Input, 3)
 		}
@@ -308,19 +311,20 @@ func (a *App) event(event core.Event) {
 			a.line(prefix + a.mark(status, color, true) + " TOOL " + oneLine(payload.Name, 40))
 			a.preview("     | ", payload.Output, 4)
 		}
+		a.toolOpen = false
+		for _, pending := range a.pendingVerification {
+			a.renderVerification(pending)
+		}
+		a.pendingVerification = nil
 	case core.EventArtifactCreated:
 		if payload, ok := event.Payload.(*core.ArtifactCreatedPayload); ok && payload.Artifact != nil {
 			a.line(prefix + a.mark("[file]", a.theme.Accent, true) + fmt.Sprintf(" ARTIFACT %s  %d bytes", oneLine(payload.Artifact.ID, 48), payload.Artifact.Size))
 		}
 	case core.EventVerification:
-		if payload, ok := event.Payload.(*core.VerificationPayload); ok && payload.Verification != nil {
-			status, color := "[fail]", a.theme.Failure
-			if payload.Verification.Status == "passed" && !payload.Verification.Stale {
-				status, color = "[ok]", a.theme.Success
-			} else if payload.Verification.Stale {
-				status, color = "[stale]", a.theme.Warning
-			}
-			a.line(prefix + a.mark(status, color, true) + fmt.Sprintf(" VERIFY %s (exit %d)", oneLine(payload.Verification.Command, a.width-24), payload.Verification.ExitCode))
+		if a.toolOpen {
+			a.pendingVerification = append(a.pendingVerification, event)
+		} else {
+			a.renderVerification(event)
 		}
 	case core.EventUsage:
 		if payload, ok := event.Payload.(*core.UsagePayload); ok {
@@ -347,6 +351,21 @@ func (a *App) event(event core.Event) {
 	default:
 		a.line(prefix + a.muted("[event] "+oneLine(event.Type, 64)))
 	}
+}
+
+func (a *App) renderVerification(event core.Event) {
+	payload, ok := event.Payload.(*core.VerificationPayload)
+	if !ok || payload.Verification == nil {
+		return
+	}
+	status, color := "[fail]", a.theme.Failure
+	if payload.Verification.Status == "passed" && !payload.Verification.Stale {
+		status, color = "[ok]", a.theme.Success
+	} else if payload.Verification.Stale {
+		status, color = "[stale]", a.theme.Warning
+	}
+	prefix := fmt.Sprintf("%04d ", event.Seq)
+	a.line(prefix + a.mark(status, color, true) + fmt.Sprintf(" VERIFY %s (exit %d)", oneLine(payload.Verification.Command, a.width-24), payload.Verification.ExitCode))
 }
 
 func (a *App) result(prefix string, result *core.Result) {
