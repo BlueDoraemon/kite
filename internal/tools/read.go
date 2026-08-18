@@ -41,7 +41,7 @@ func (s *Set) Read() *Tool {
 			if startLine > 0 || endLine > 0 {
 				content = lineRange(content, startLine, endLine)
 			}
-			return content, nil
+			return s.inlineIfSmall("read", content), nil
 		},
 	}
 }

@@ -17,11 +17,11 @@ const maxBashOutput = 32 * 1024
 
 // Bash returns a Tool that runs a shell command in the working directory.
 // The command runs with a 30 second timeout and its process tree is killed
-// on timeout.
+// on timeout. Large outputs are saved to an artifact referenced in the result.
 func (s *Set) Bash() *Tool {
 	return &Tool{
 		name:        "bash",
-		description: "Run a shell command in the repository working directory. The command runs with a 30 second timeout. Set purpose to \"verification\" to mark a verification run.",
+		description: "Run a shell command in the repository working directory. The command runs with a 30 second timeout. Set purpose to \"verification\" to mark a verification run. Large outputs are saved to an artifact referenced in the result.",
 		specs: []argSpec{
 			{name: "command", typ: "string", desc: "The shell command to run.", required: true},
 			{name: "working_dir", typ: "string", desc: "Optional relative working directory for the command."},
@@ -38,16 +38,13 @@ func (s *Set) Bash() *Tool {
 				}
 				dir = resolved
 			}
-			return runShell(ctx, dir, command)
+			return s.runShell(ctx, dir, command)
 		},
 	}
 }
 
-// runShell runs a shell command and returns its combined output.
-func runShell(ctx context.Context, dir, command string) (string, error) {
+func (s *Set) runShell(ctx context.Context, dir, command string) (string, error) {
 	cmd := newShellCommand(ctx, dir, command)
-	// The tool's own timeout bounds runaway commands even when the caller's
-	// context has no deadline.
 	timer := time.AfterFunc(BashTimeout, func() {
 		killProcessTree(cmd)
 	})
@@ -56,19 +53,21 @@ func runShell(ctx context.Context, dir, command string) (string, error) {
 	if ctx.Err() != nil {
 		return "", ctx.Err()
 	}
-	if len(out) > maxBashOutput {
-		out = out[:maxBashOutput]
-		out = append(out, []byte("\n... output truncated ...")...)
-	}
 	result := string(out)
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
+			if len(result) > maxInline {
+				return fmt.Sprintf("exit status %d (output stored as artifact)\n%s", ee.ExitCode(), s.storeArtifact("bash", result)), nil
+			}
 			return fmt.Sprintf("exit status %d\n%s", ee.ExitCode(), result), nil
 		}
 		return "", err
 	}
+	if len(out) > maxBashOutput {
+		result = result[:maxBashOutput] + "\n... output truncated ..."
+	}
 	if strings.TrimSpace(result) == "" {
 		return "(no output)", nil
 	}
-	return result, nil
+	return s.inlineIfSmall("bash", result), nil
 }
