@@ -142,10 +142,10 @@ func Check(dir string) error {
 		}
 		cData, err := os.ReadFile(committed)
 		if err != nil {
-			return fmt.Errorf("schema %s is missing; run go run ./internal/schemagen", name)
+			return fmt.Errorf("schema %s is missing; run go run ./cmd/schemagen", name)
 		}
 		if string(gData) != string(cData) {
-			return fmt.Errorf("schema %s is out of date; run go run ./internal/schemagen", name)
+			return fmt.Errorf("schema %s is out of date; run go run ./cmd/schemagen", name)
 		}
 	}
 	return nil

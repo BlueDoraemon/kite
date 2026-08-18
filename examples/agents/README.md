@@ -9,7 +9,7 @@ A Go API session driver: create a session, drive a prompt, and read the
 resulting events.
 
 ```sh
-KITE_API_KEY=sk-... go run ./examples/agents/go-session
+go run ./examples/agents/go-session
 ```
 
 ## custom-tool
@@ -17,7 +17,7 @@ KITE_API_KEY=sk-... go run ./examples/agents/go-session
 A custom `kite.Tool` (uppercases its input) passed to a session.
 
 ```sh
-KITE_API_KEY=sk-... go run ./examples/agents/custom-tool
+go run ./examples/agents/custom-tool
 ```
 
 ## rpc-client
@@ -38,6 +38,8 @@ sh ./examples/agents/recipes.sh
 
 ## Notes
 
-- Set `KITE_API_KEY`, `KITE_BASE_URL`, and `KITE_MODEL` as needed, or pass
-  `--from-crush` to reuse the Crush-selected configuration.
+- The Go API examples use small self-contained providers so they can be copied
+  into another module. The RPC example and shell recipes use the CLI's
+  OpenAI-compatible provider; configure it with `KITE_API_KEY`,
+  `KITE_BASE_URL`, and `KITE_MODEL`, or `--from-crush` where shown.
 - Examples are compiled and checked by the documentation validation suite.

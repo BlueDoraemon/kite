@@ -3,18 +3,16 @@
 //
 // Usage:
 //
-//	KITE_API_KEY=sk-... go run ./examples/agents/custom-tool
+//	go run ./examples/agents/custom-tool
 package main
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/BlueDoraemon/kite-core"
-	"github.com/BlueDoraemon/kite-core/internal/provider/openai"
 )
 
 // upperTool is a custom tool that uppercases its input.
@@ -41,34 +39,35 @@ func (upperTool) Run(ctx context.Context, input string) (string, error) {
 	return strings.ToUpper(args.Text), nil
 }
 
-func main() {
-	apiKey := os.Getenv("KITE_API_KEY")
-	if apiKey == "" {
-		fmt.Fprintln(os.Stderr, "set KITE_API_KEY to run this example")
-		os.Exit(2)
-	}
-	provider := openai.New(
-		envOr("KITE_BASE_URL", "https://api.openai.com/v1"),
-		apiKey,
-		envOr("KITE_MODEL", "gpt-4o-mini"),
-	)
+type exampleProvider struct{ turn int }
 
+func (p *exampleProvider) Complete(_ context.Context, _ *kite.Session, _ []kite.Tool, onEvent func(kite.ProviderEvent)) error {
+	p.turn++
+	if p.turn == 1 {
+		onEvent(kite.ProviderEvent{ToolCall: &kite.ToolCall{ID: "call_1", Name: "upper", Input: `{"text":"hello"}`}})
+	} else {
+		onEvent(kite.ProviderEvent{Text: "The tool returned HELLO."})
+	}
+	onEvent(kite.ProviderEvent{Done: true})
+	return nil
+}
+
+func main() {
+	provider := &exampleProvider{}
 	sess, err := kite.NewSession(kite.Config{
 		Provider:   provider,
-		Model:      provider.Model,
+		Model:      "example",
 		WorkingDir: ".",
 		// A custom tool on its own; nil Tools installs the built-ins.
 		Tools: []kite.Tool{upperTool{}},
 	})
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "kite:", err)
-		os.Exit(2)
+		panic(err)
 	}
 
 	ch, err := sess.Prompt(context.Background(), "Call the upper tool with the text 'hello'.")
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "kite:", err)
-		os.Exit(2)
+		panic(err)
 	}
 	for ev := range ch {
 		if ev.Type == kite.EventTextDelta {
@@ -76,11 +75,4 @@ func main() {
 		}
 	}
 	fmt.Println()
-}
-
-func envOr(key, def string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return def
 }

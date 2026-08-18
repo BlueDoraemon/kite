@@ -68,8 +68,8 @@ Usage:
   kite rpc                           Serve the NDJSON RPC protocol on stdin/stdout
   kite status [session-id]           Show session status
   kite inspect <tool-id>             Show a tool's schema
-  kite artifact <artifact-id> [--offset N --limit N]  Retrieve an artifact
-  kite context [session-id] [--full]  Show the session context
+  kite artifact [--offset N --limit N] <artifact-id>  Retrieve an artifact
+  kite context [--full] [session-id]  Show the session context
 
 Environment:
   KITE_API_KEY, KITE_BASE_URL, KITE_MODEL, KITE_DATA_DIR

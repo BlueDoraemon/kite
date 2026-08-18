@@ -3,44 +3,37 @@
 //
 // Usage:
 //
-//	KITE_API_KEY=sk-... go run ./examples/agents/go-session
+//	go run ./examples/agents/go-session
 package main
 
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/BlueDoraemon/kite-core"
-	"github.com/BlueDoraemon/kite-core/internal/provider/openai"
 )
 
-func main() {
-	apiKey := os.Getenv("KITE_API_KEY")
-	if apiKey == "" {
-		fmt.Fprintln(os.Stderr, "set KITE_API_KEY to run this example")
-		os.Exit(2)
-	}
-	provider := openai.New(
-		envOr("KITE_BASE_URL", "https://api.openai.com/v1"),
-		apiKey,
-		envOr("KITE_MODEL", "gpt-4o-mini"),
-	)
+type exampleProvider struct{}
 
+func (exampleProvider) Complete(_ context.Context, _ *kite.Session, _ []kite.Tool, onEvent func(kite.ProviderEvent)) error {
+	onEvent(kite.ProviderEvent{Text: "ok"})
+	onEvent(kite.ProviderEvent{Done: true})
+	return nil
+}
+
+func main() {
 	sess, err := kite.NewSession(kite.Config{
-		Provider:   provider,
-		Model:      provider.Model,
+		Provider:   exampleProvider{},
+		Model:      "example",
 		WorkingDir: ".",
 	})
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "kite:", err)
-		os.Exit(2)
+		panic(err)
 	}
 
 	ch, err := sess.Prompt(context.Background(), "Reply with exactly the word ok.")
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "kite:", err)
-		os.Exit(2)
+		panic(err)
 	}
 
 	for ev := range ch {
@@ -52,15 +45,7 @@ func main() {
 			fmt.Printf("\nstatus: %s\n", res.Status)
 		case kite.EventSessionFailed:
 			e := ev.Payload.(*kite.SessionFailedPayload).Error
-			fmt.Fprintln(os.Stderr, "failed:", e.Message)
-			os.Exit(1)
+			panic(e)
 		}
 	}
-}
-
-func envOr(key, def string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return def
 }
