@@ -142,20 +142,13 @@ func (s *Session) run(ctx context.Context, text string, ch chan<- Event) {
 			// Track changed files for edit/bash tools.
 			if call.Name == "edit" || call.Name == "bash" {
 				recordChangedFiles(changed, s.cfg.WorkingDir, call.Name, call.Input)
-				if s.latestVerification != nil && worktreeChanged(beforeTool, snapshotWorktree(s.cfg.WorkingDir)) {
-					stale := *s.latestVerification
-					stale.Stale = true
-					s.latestVerification = &stale
-					if err := s.emit(ch, EventVerification, &VerificationPayload{Verification: &stale}); err != nil {
-						return
-					}
-				}
 			}
 
 			// Verification purpose: record verification status. The bash
 			// tool reports a non-zero exit as a string result with a nil
 			// error, so the status is parsed from the output.
-			if call.Name == "bash" && isVerification(call.Input) {
+			verificationCall := call.Name == "bash" && isVerification(call.Input)
+			if verificationCall {
 				ver := &Verification{Command: verificationCommand(call.Input), Status: "failed", ExitCode: 1}
 				if runErr == nil {
 					code := exitCodeFromOutput(rawOutput)
@@ -171,6 +164,13 @@ func (s *Session) run(ctx context.Context, text string, ch chan<- Event) {
 				}
 				s.latestVerification = ver
 				if err := s.emit(ch, EventVerification, &VerificationPayload{Verification: ver}); err != nil {
+					return
+				}
+			} else if s.latestVerification != nil && worktreeChanged(beforeTool, snapshotWorktree(s.cfg.WorkingDir)) {
+				stale := *s.latestVerification
+				stale.Stale = true
+				s.latestVerification = &stale
+				if err := s.emit(ch, EventVerification, &VerificationPayload{Verification: &stale}); err != nil {
 					return
 				}
 			}

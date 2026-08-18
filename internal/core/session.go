@@ -104,6 +104,8 @@ func LoadSession(cfg Config, id string) (*Session, error) {
 func replaySession(s *Session, evs []*Event) {
 	pending := make(map[string]ToolCall)
 	pendingOrder := make([]string, 0)
+	assistantIndex := -1
+	var assistantText string
 	for _, ev := range evs {
 		switch ev.Type {
 		case EventSessionStarted:
@@ -112,23 +114,21 @@ func replaySession(s *Session, evs []*Event) {
 			if p, ok := ev.Payload.(*UserMessagePayload); ok {
 				s.Messages = append(s.Messages, Message{Role: RoleUser, Content: p.Text})
 			}
+		case EventModelStarted:
+			assistantIndex = -1
+			assistantText = ""
 		case EventTextDelta:
 			if p, ok := ev.Payload.(*TextDeltaPayload); ok {
-				if n := len(s.Messages); n > 0 && s.Messages[n-1].Role == RoleAssistant {
-					s.Messages[n-1].Content += p.Text
-				} else {
-					s.Messages = append(s.Messages, Message{Role: RoleAssistant, Content: p.Text})
-				}
+				assistantText += p.Text
 			}
 		case EventToolStarted:
 			if p, ok := ev.Payload.(*ToolStartedPayload); ok {
 				call := ToolCall{ID: p.CallID, Name: p.Name, Input: p.Input}
-				n := len(s.Messages)
-				if n == 0 || s.Messages[n-1].Role != RoleAssistant {
+				if assistantIndex < 0 {
 					s.Messages = append(s.Messages, Message{Role: RoleAssistant})
-					n++
+					assistantIndex = len(s.Messages) - 1
 				}
-				s.Messages[n-1].ToolCalls = append(s.Messages[n-1].ToolCalls, call)
+				s.Messages[assistantIndex].ToolCalls = append(s.Messages[assistantIndex].ToolCalls, call)
 				pending[p.CallID] = call
 				pendingOrder = append(pendingOrder, p.CallID)
 			}
@@ -144,11 +144,15 @@ func replaySession(s *Session, evs []*Event) {
 		case EventModelCompleted:
 			if p, ok := ev.Payload.(*ModelCompletedPayload); ok {
 				s.Turn = p.Turn
+				s.Messages = append(s.Messages, Message{Role: RoleAssistant, Content: assistantText})
+				assistantIndex = len(s.Messages) - 1
+				assistantText = ""
 			}
 		case EventInterruptedTool:
 			if p, ok := ev.Payload.(*InterruptedToolPayload); ok && p.Call != nil {
 				s.Interrupted = append(s.Interrupted, *p.Call)
 				delete(pending, p.Call.ID)
+				s.Messages = append(s.Messages, interruptedToolResult(*p.Call))
 			}
 		case EventVerification:
 			if p, ok := ev.Payload.(*VerificationPayload); ok && p.Verification != nil {
@@ -161,9 +165,13 @@ func replaySession(s *Session, evs []*Event) {
 		if call, ok := pending[id]; ok {
 			s.Interrupted = append(s.Interrupted, call)
 			s.pendingInterrupts = append(s.pendingInterrupts, call)
-			s.Messages = append(s.Messages, Message{Role: RoleTool, ToolCallID: call.ID, Content: "error: tool call was interrupted and was not replayed"})
+			s.Messages = append(s.Messages, interruptedToolResult(call))
 		}
 	}
+}
+
+func interruptedToolResult(call ToolCall) Message {
+	return Message{Role: RoleTool, ToolCallID: call.ID, Content: "error: tool call was interrupted and was not replayed"}
 }
 
 // Prompt runs a prompt on the session and returns a channel of events. Only
