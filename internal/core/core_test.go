@@ -123,6 +123,34 @@ func TestRunToolCallThenFinishes(t *testing.T) {
 	}
 }
 
+func TestVerificationSealsCompletedToolHunk(t *testing.T) {
+	p := &scriptProvider{turns: []turn{
+		{toolCalls: []ToolCall{{ID: "c1", Name: "bash", Input: `{"command":"go test ./...","purpose":"verification"}`}}},
+		{text: "done"},
+	}}
+	dir := t.TempDir()
+	s, err := NewSession(Config{
+		Provider: p, Model: "m", WorkingDir: dir, DataDir: filepath.Join(dir, "data"),
+		Tools: []Tool{testTool{name: "bash", run: func() (string, error) { return "ok", nil }}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	events, err := s.Prompt(context.Background(), "verify")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sequence []string
+	for event := range events {
+		if event.Type == EventToolStarted || event.Type == EventToolFinished || event.Type == EventVerification {
+			sequence = append(sequence, event.Type)
+		}
+	}
+	if got, want := strings.Join(sequence, ","), "tool.started,tool.finished,verification"; got != want {
+		t.Fatalf("tool/verification event order = %s, want %s", got, want)
+	}
+}
+
 func TestRunMaxTurns(t *testing.T) {
 	p := &scriptProvider{turns: []turn{
 		{toolCalls: []ToolCall{{ID: "c1", Name: "echo", Input: "{}"}}},

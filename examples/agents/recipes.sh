@@ -12,6 +12,11 @@ kite inspect bash
 echo "== context =="
 kite context
 
+echo "== interactive terminal workspace =="
+# Uncomment for an interactive session. Use an existing session id to resume.
+# kite tui --theme night-flight
+# kite tui --plain "$SESSION_ID"
+
 echo "== run that produces an artifact =="
 kite run "list every file in this repository"
 

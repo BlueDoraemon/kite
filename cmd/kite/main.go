@@ -9,6 +9,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -21,6 +22,7 @@ import (
 	"github.com/BlueDoraemon/kite-core/internal/provider/openai"
 	"github.com/BlueDoraemon/kite-core/internal/rpc"
 	"github.com/BlueDoraemon/kite-core/internal/tools"
+	"github.com/BlueDoraemon/kite-core/internal/tui"
 )
 
 func main() {
@@ -37,6 +39,8 @@ func run(args []string) int {
 	switch cmd {
 	case "run":
 		return cmdRun(rest)
+	case "tui":
+		return cmdTUI(rest)
 	case "resume":
 		return cmdResume(rest)
 	case "rpc":
@@ -64,6 +68,7 @@ func usage() {
 
 Usage:
   kite run [flags] <prompt>          Run a prompt in the current directory
+  kite tui [flags] [session-id]      Open the interactive terminal workspace
   kite resume <session-id> [prompt]  Resume a session
   kite rpc                           Serve the NDJSON RPC protocol on stdin/stdout
   kite status [session-id]           Show session status
@@ -72,11 +77,78 @@ Usage:
   kite context [--full] [session-id]  Show the session context
 
 Environment:
-  KITE_API_KEY, KITE_BASE_URL, KITE_MODEL, KITE_DATA_DIR
+  KITE_API_KEY, KITE_BASE_URL, KITE_MODEL, KITE_DATA_DIR, KITE_THEME, NO_COLOR
   --from-crush reads the Crush-selected large model, credential, and endpoint
 
 Exit codes: 0 completed, 1 runtime/verification failure, 2 usage/config error
 `)
+}
+
+// cmdTUI opens an interactive, durable session workspace in the terminal.
+func cmdTUI(args []string) int {
+	fs := flag.NewFlagSet("tui", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	var (
+		baseURL   = fs.String("base-url", "", "OpenAI-compatible API base URL")
+		model     = fs.String("model", "", "model to use")
+		fromCrush = fs.Bool("from-crush", false, "import model, credential, and endpoint from Crush")
+		themeName = fs.String("theme", envOr("KITE_THEME", "night-flight"), "terminal theme: night-flight, paper-trail, or high-contrast")
+		plain     = fs.Bool("plain", false, "disable ANSI color and screen clearing")
+	)
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if fs.NArg() > 1 {
+		fmt.Fprintln(os.Stderr, "kite: usage: kite tui [flags] [session-id]")
+		return 2
+	}
+	if _, err := tui.ParseTheme(*themeName); err != nil {
+		fmt.Fprintln(os.Stderr, "kite:", err)
+		return 2
+	}
+
+	provider, err := providerConfig(baseURL, model, *fromCrush)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "kite:", err)
+		return 2
+	}
+	dir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "kite:", err)
+		return 1
+	}
+
+	cfg := sessionConfig(provider, dir, false)
+	var sess *core.Session
+	if fs.NArg() == 1 {
+		sess, err = core.LoadSession(cfg, fs.Arg(0))
+	} else {
+		sess, err = core.NewSession(cfg)
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "kite:", err)
+		return 2
+	}
+
+	color := !*plain && tui.SupportsANSI(os.Stdout)
+	clear := color && tui.SupportsANSI(os.Stdin)
+	app, err := tui.New(tui.Config{
+		Session: sess, SessionID: sess.ID, Model: sess.Model, WorkDir: dir,
+		Theme: *themeName, In: os.Stdin, Out: os.Stdout, Context: sess.BuildContext,
+		Color: color, Clear: clear,
+	})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "kite:", err)
+		return 2
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if err := app.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+		fmt.Fprintln(os.Stderr, "kite:", err)
+		return 1
+	}
+	return 0
 }
 
 // providerConfig resolves explicit flags and the API key environment setting,

@@ -46,6 +46,13 @@ repository working directory only.
   previews and should be treated as sensitive.
 - The data directory defaults to user-only XDG/LOCALAPPDATA storage.
 
+## Terminal output
+
+The TUI treats model text, tool input and output, paths, and persisted errors
+as untrusted display content. Control bytes are removed before rendering, so
+content cannot inject ANSI or OSC commands. `NO_COLOR`, `-plain`, redirected
+stdout, and unsupported terminals use the same ledger without ANSI styling.
+
 ## Redaction guarantees
 
 - No API keys, OAuth tokens, or credentials in any event, error, log, or RPC

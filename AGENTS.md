@@ -4,23 +4,25 @@ Guidance for contributor agents working in this repository.
 
 ## Project purpose
 
-Kite is a minimal, standard-library-only agent runtime for Go, plus a CLI
-(`kite run <prompt>`) that drives a model through an OpenAI-compatible API with
-read, edit, bash, and artifact tools. The runtime is embeddable: the root
-package `kite` exposes a small public API backed by `internal/core`.
+Kite is a minimal, standard-library-only agent runtime for Go, plus streaming
+and interactive terminal CLI surfaces that drive a model through an
+OpenAI-compatible API with read, edit, bash, and artifact tools. The runtime is
+embeddable: the root package `kite` exposes a small public API backed by
+`internal/core`.
 
 ## Current milestone
 
-The full 15-step roadmap is implemented: streaming provider, durable events,
-artifacts, sessions, resume, RPC, inspection commands, repository
-instructions, and complete agent documentation. The milestone is release-ready
-when `go build ./...`, `go vet ./...`, `go test ./...` pass and all release
-targets cross-compile.
+The full runtime roadmap and the event-ledger TUI are implemented: streaming
+provider, durable events, artifacts, sessions, resume, RPC, inspection
+commands, repository instructions, interactive multi-prompt sessions, three
+terminal themes, and complete agent documentation. The milestone is
+release-ready when `go build ./...`, `go vet ./...`, `go test ./...` pass and
+all release targets cross-compile.
 
 ## Explicit non-goals
 
-- No TUI, plugins, multi-agent orchestration, First Mate integration,
-  database, remote execution, or CI-delivery product features.
+- No plugins, multi-agent orchestration, First Mate integration, database,
+  remote execution, browser UI, or CI-delivery product features.
 - No automatic provider retries after streamed output.
 - No replaying of interrupted tool calls.
 
@@ -36,6 +38,8 @@ targets cross-compile.
   built-in installer with core via `core.RegisterBuiltins` (no import cycle).
 - `internal/persist` — (unused; persistence lives in `internal/core/store.go`).
 - `internal/rpc` — the NDJSON RPC protocol.
+- `internal/tui` — the ANSI/plain-text event-ledger terminal workspace. It is
+  a view over `core.Session`, never a second agent loop.
 - `internal/crush` — reads Crush's persisted config for `--from-crush`.
 - `cmd/kite` — the CLI entry point.
 
@@ -73,6 +77,9 @@ POSIX (`sh -c`, process groups) and Windows (`cmd.exe /C`, `taskkill /T`).
 
 - Every target in the release workflow must build. Shell execution and
   process-tree termination are build-tagged.
+- The TUI uses standard ANSI sequences only on detected interactive terminals;
+  redirected output, `NO_COLOR`, unsupported Windows terminals, and `-plain`
+  use the plain-text path.
 - Data directory: `$KITE_DATA_DIR`, else XDG data storage (Unix) or
   LOCALAPPDATA (Windows). User-only permissions where supported.
 
@@ -143,5 +150,8 @@ ignored on load. Update `docs/agents/sessions.md`.
   against `testdata/broken-go-project`.
 - The live acceptance test is opt-in (`KITE_LIVE_TEST=1`).
 - RPC framing is tested through its executable NDJSON interface.
+- TUI tests drive prompts and slash commands through its input/output boundary
+  and assert rendered event behavior, theme changes, recovery, and control-byte
+  sanitization.
 - Documentation validation regenerates and compares schemas, compiles the Go
   examples, and checks internal Markdown links.
