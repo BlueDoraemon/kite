@@ -36,6 +36,9 @@ Shell recipes for run, resume, artifact, context, and RPC.
 sh ./examples/agents/recipes.sh
 ```
 
+The recipes also show how to open the interactive terminal workspace without
+changing the non-interactive commands.
+
 ## Notes
 
 - The Go API examples use small self-contained providers so they can be copied

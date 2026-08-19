@@ -19,6 +19,18 @@ kite resume sess_...                                   # continue from the last 
 Interrupted tool calls are never replayed; the session continues from the
 last complete durable turn.
 
+## Work interactively
+
+```sh
+kite tui --theme night-flight
+kite tui --theme paper-trail sess_... # flags precede the session id
+NO_COLOR=1 kite tui sess_...
+```
+
+Enter several prompts in one durable session. Use `/context` to inspect the
+bounded context, `/theme high-contrast` to change palette, and `/quit` to leave
+without deleting the session.
+
 ## Inspect large output
 
 ```sh

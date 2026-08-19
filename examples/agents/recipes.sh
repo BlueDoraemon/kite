@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
-# recipes.sh demonstrates the kite CLI workflows: run, resume, artifact, and
-# context. Set KITE_API_KEY (or use --from-crush) before running.
+# recipes.sh demonstrates the kite CLI workflows: run, TUI, resume, artifact,
+# context, and RPC. Set KITE_API_KEY (or use --from-crush) before running.
 set -e
 
 echo "== run =="
@@ -11,6 +11,11 @@ kite inspect bash
 
 echo "== context =="
 kite context
+
+echo "== interactive terminal workspace =="
+# Uncomment for an interactive session. Use an existing session id to resume.
+# kite tui --theme night-flight
+# kite tui --plain "$SESSION_ID"
 
 echo "== run that produces an artifact =="
 kite run "list every file in this repository"

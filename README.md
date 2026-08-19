@@ -5,8 +5,9 @@ agent that can explain and modify a repository.
 
 Kite provides the building blocks for running agents reliably: sessions, a
 streaming model provider, tools, durable events, artifacts, context
-management, resume, and an NDJSON RPC protocol. It is designed to work on its
-own or underneath supervisors and orchestrators.
+management, resume, an interactive terminal workspace, and an NDJSON RPC
+protocol. It is designed to work on its own or underneath supervisors and
+orchestrators.
 
 > Small core. Open interfaces. Easy to compose.
 
@@ -32,6 +33,7 @@ Set the model endpoint and key, then run:
 export KITE_API_KEY=sk-...
 kite run "explain this repository"
 kite run "add a --retries flag to the upload command"
+kite tui
 ```
 
 To reuse the model, credential, and endpoint Crush has selected:
@@ -48,6 +50,7 @@ kite run --from-crush "explain this repository"
 | `KITE_BASE_URL` | `-base-url` | `https://api.openai.com/v1` | OpenAI-compatible API base URL |
 | `KITE_MODEL` | `-model` | `gpt-4o-mini` | Model identifier |
 | `KITE_DATA_DIR` | (none) | XDG/LOCALAPPDATA | Where sessions and artifacts are stored |
+| `KITE_THEME` | `-theme` on `tui` | `night-flight` | Terminal workspace theme |
 
 See [Providers](docs/agents/providers.md) for configuration precedence and
 `--from-crush` behavior.
@@ -84,12 +87,17 @@ session -> context -> provider -> tools -> artifacts -> events
 | Command | Purpose |
 | --- | --- |
 | `kite run [flags] <prompt>` | Run a prompt in the current directory |
+| `kite tui [flags] [session-id]` | Open or resume the interactive terminal workspace |
 | `kite resume <session-id> [prompt]` | Resume a session |
 | `kite rpc` | Serve the NDJSON RPC protocol on stdin/stdout |
 | `kite status [session-id]` | Show session status |
 | `kite inspect <tool-id>` | Show a tool's schema |
 | `kite artifact [--offset N --limit N] <artifact-id>` | Retrieve an artifact |
 | `kite context [--full] [session-id]` | Show the session context |
+
+The terminal workspace presents the durable event stream as a chronological
+hunk ledger. Choose `night-flight`, `paper-trail`, or `high-contrast` with
+`kite tui -theme <name>`. Use `-plain` or `NO_COLOR=1` for a plain-text stream.
 
 Exit codes: `0` completed, `1` runtime or verification failure, `2` usage or
 configuration error.
@@ -114,6 +122,7 @@ configuration error.
 - `internal/provider/openai` — the streaming OpenAI-compatible adapter
 - `internal/tools` — the read, edit, bash, and artifact tools
 - `internal/rpc` — the NDJSON RPC protocol
+- `internal/tui` — the interactive event-ledger terminal workspace
 - `internal/crush` — the `--from-crush` import
 - `docs/agents` — the agent documentation reference
 - `docs/schemas/v1` — versioned JSON schemas
@@ -125,6 +134,7 @@ configuration error.
 - [Architecture](docs/agents/architecture.md)
 - [Go API](docs/agents/go-api.md)
 - [CLI](docs/agents/cli.md)
+- [Terminal UI](docs/agents/tui.md)
 - [Tools](docs/agents/tools.md)
 - [Events](docs/agents/events.md)
 - [Sessions](docs/agents/sessions.md)

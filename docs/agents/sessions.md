@@ -48,6 +48,9 @@ kite resume sess_... "now also add a README"
 
 Resume only from complete durable turns.
 
+`kite tui [session-id]` uses the same load and replay path, then keeps the
+session open for multiple prompts. `/quit` leaves the append-only log intact.
+
 ## See also
 
 - [Events](events.md)

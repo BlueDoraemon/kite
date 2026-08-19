@@ -3,7 +3,7 @@
 Kite's runtime flows through a small set of stages:
 
 ```text
-session -> context -> provider -> tools -> artifacts -> events
+session -> context -> provider -> tools -> artifacts -> events -> interfaces
 ```
 
 ## Session
@@ -53,8 +53,17 @@ its JSONL log.
 When a prompt completes, Kite builds a structured `Result`: status, final
 text, files changed during that prompt, verification, and usage.
 
+## Interfaces
+
+The streaming CLI, terminal workspace, Go API, and RPC server are views over
+the same session and durable event contracts. `internal/tui` consumes events
+from `Session.Prompt`; it neither invokes tools directly nor maintains a second
+conversation state. ANSI styling is applied only after model, tool, path, and
+error content has been stripped of terminal control bytes.
+
 ## See also
 
 - [Go API](go-api.md)
 - [Events](events.md)
 - [Sessions](sessions.md)
+- [Terminal UI](tui.md)

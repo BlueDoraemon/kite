@@ -31,6 +31,16 @@ kite inspect edit
 kite inspect artifact
 ```
 
+To keep one durable session open for several prompts, start the terminal
+workspace:
+
+```sh
+kite tui
+```
+
+Use `/help` inside the workspace. Start from an existing session with
+`kite tui sess_...`.
+
 ## 3. Fix
 
 Ask the agent to fix a problem. It reads, edits, and verifies:
@@ -61,4 +71,5 @@ The structured result contains:
 
 - [Architecture](architecture.md) — how the pieces fit together
 - [CLI](cli.md) — every command and flag
+- [Terminal UI](tui.md) — interactive sessions and themes
 - [Recipes](recipes.md) — common workflows

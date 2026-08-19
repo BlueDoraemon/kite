@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/BlueDoraemon/kite-core/internal/core"
@@ -60,5 +63,30 @@ func TestRPCStatusReturnsRequestedSession(t *testing.T) {
 	}
 	if status.SessionID != session.ID || status.Messages == 0 {
 		t.Fatalf("status = %+v", status)
+	}
+}
+
+func TestTUIRejectsUnknownThemeBeforeSessionSetup(t *testing.T) {
+	if code := run([]string{"tui", "-theme", "ultraviolet"}); code != 2 {
+		t.Fatalf("run(tui invalid theme) = %d, want 2", code)
+	}
+}
+
+func TestTUIExecutableRunsPlainInteractiveSession(t *testing.T) {
+	cmd := exec.Command("go", "run", ".", "tui", "-plain", "-theme", "paper-trail")
+	cmd.Env = append(os.Environ(), "KITE_DATA_DIR="+filepath.Join(t.TempDir(), "data"))
+	cmd.Stdin = strings.NewReader("/theme high-contrast\n/quit\n")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("kite tui failed: %v\n%s", err, out)
+	}
+	text := string(out)
+	for _, want := range []string{"KITE | session sess_", "theme paper-trail", "theme set to high-contrast", "session retained as sess_"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("kite tui output missing %q:\n%s", want, text)
+		}
+	}
+	if strings.ContainsRune(text, '\x1b') {
+		t.Fatalf("kite tui -plain emitted ANSI escapes: %q", text)
 	}
 }

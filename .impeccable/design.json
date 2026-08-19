@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-18T15:18:57Z",
+  "title": "Design System: Kite",
+  "extensions": {
+    "colorMeta": {
+      "night-flight-background": { "role": "neutral", "displayName": "Night Flight Canvas", "canonical": "#07111F", "tonalRamp": ["color-mix(in oklch, #07111F 35%, black)","color-mix(in oklch, #07111F 55%, black)","color-mix(in oklch, #07111F 75%, black)","#07111F","color-mix(in oklch, #07111F 80%, white)","color-mix(in oklch, #07111F 60%, white)","color-mix(in oklch, #07111F 40%, white)","color-mix(in oklch, #07111F 20%, white)"] },
+      "night-flight-text": { "role": "neutral", "displayName": "Night Flight Text", "canonical": "#D8E2F0", "tonalRamp": ["color-mix(in oklch, #D8E2F0 35%, black)","color-mix(in oklch, #D8E2F0 55%, black)","color-mix(in oklch, #D8E2F0 75%, black)","#D8E2F0","color-mix(in oklch, #D8E2F0 80%, white)","color-mix(in oklch, #D8E2F0 60%, white)","color-mix(in oklch, #D8E2F0 40%, white)","color-mix(in oklch, #D8E2F0 20%, white)"] },
+      "night-flight-accent": { "role": "primary", "displayName": "Night Flight Accent", "canonical": "#6EA8FF", "tonalRamp": ["color-mix(in oklch, #6EA8FF 35%, black)","color-mix(in oklch, #6EA8FF 55%, black)","color-mix(in oklch, #6EA8FF 75%, black)","#6EA8FF","color-mix(in oklch, #6EA8FF 80%, white)","color-mix(in oklch, #6EA8FF 60%, white)","color-mix(in oklch, #6EA8FF 40%, white)","color-mix(in oklch, #6EA8FF 20%, white)"] },
+      "night-flight-success": { "role": "secondary", "displayName": "Night Flight Success", "canonical": "#64D49B", "tonalRamp": ["color-mix(in oklch, #64D49B 35%, black)","color-mix(in oklch, #64D49B 55%, black)","color-mix(in oklch, #64D49B 75%, black)","#64D49B","color-mix(in oklch, #64D49B 80%, white)","color-mix(in oklch, #64D49B 60%, white)","color-mix(in oklch, #64D49B 40%, white)","color-mix(in oklch, #64D49B 20%, white)"] },
+      "night-flight-warning": { "role": "secondary", "displayName": "Night Flight Warning", "canonical": "#F2B94B", "tonalRamp": ["color-mix(in oklch, #F2B94B 35%, black)","color-mix(in oklch, #F2B94B 55%, black)","color-mix(in oklch, #F2B94B 75%, black)","#F2B94B","color-mix(in oklch, #F2B94B 80%, white)","color-mix(in oklch, #F2B94B 60%, white)","color-mix(in oklch, #F2B94B 40%, white)","color-mix(in oklch, #F2B94B 20%, white)"] },
+      "night-flight-failure": { "role": "secondary", "displayName": "Night Flight Failure", "canonical": "#FF6B6B", "tonalRamp": ["color-mix(in oklch, #FF6B6B 35%, black)","color-mix(in oklch, #FF6B6B 55%, black)","color-mix(in oklch, #FF6B6B 75%, black)","#FF6B6B","color-mix(in oklch, #FF6B6B 80%, white)","color-mix(in oklch, #FF6B6B 60%, white)","color-mix(in oklch, #FF6B6B 40%, white)","color-mix(in oklch, #FF6B6B 20%, white)"] },
+      "night-flight-muted": { "role": "neutral", "displayName": "Night Flight Muted", "canonical": "#8290A4", "tonalRamp": ["color-mix(in oklch, #8290A4 35%, black)","color-mix(in oklch, #8290A4 55%, black)","color-mix(in oklch, #8290A4 75%, black)","#8290A4","color-mix(in oklch, #8290A4 80%, white)","color-mix(in oklch, #8290A4 60%, white)","color-mix(in oklch, #8290A4 40%, white)","color-mix(in oklch, #8290A4 20%, white)"] },
+      "paper-trail-background": { "role": "neutral", "displayName": "Paper Trail Canvas", "canonical": "#F5F0E4", "tonalRamp": ["color-mix(in oklch, #F5F0E4 35%, black)","color-mix(in oklch, #F5F0E4 55%, black)","color-mix(in oklch, #F5F0E4 75%, black)","#F5F0E4","color-mix(in oklch, #F5F0E4 80%, white)","color-mix(in oklch, #F5F0E4 60%, white)","color-mix(in oklch, #F5F0E4 40%, white)","color-mix(in oklch, #F5F0E4 20%, white)"] },
+      "paper-trail-text": { "role": "neutral", "displayName": "Paper Trail Text", "canonical": "#20252C", "tonalRamp": ["color-mix(in oklch, #20252C 35%, black)","color-mix(in oklch, #20252C 55%, black)","color-mix(in oklch, #20252C 75%, black)","#20252C","color-mix(in oklch, #20252C 80%, white)","color-mix(in oklch, #20252C 60%, white)","color-mix(in oklch, #20252C 40%, white)","color-mix(in oklch, #20252C 20%, white)"] },
+      "paper-trail-accent": { "role": "primary", "displayName": "Paper Trail Accent", "canonical": "#245D96", "tonalRamp": ["color-mix(in oklch, #245D96 35%, black)","color-mix(in oklch, #245D96 55%, black)","color-mix(in oklch, #245D96 75%, black)","#245D96","color-mix(in oklch, #245D96 80%, white)","color-mix(in oklch, #245D96 60%, white)","color-mix(in oklch, #245D96 40%, white)","color-mix(in oklch, #245D96 20%, white)"] },
+      "paper-trail-success": { "role": "secondary", "displayName": "Paper Trail Success", "canonical": "#347A45", "tonalRamp": ["color-mix(in oklch, #347A45 35%, black)","color-mix(in oklch, #347A45 55%, black)","color-mix(in oklch, #347A45 75%, black)","#347A45","color-mix(in oklch, #347A45 80%, white)","color-mix(in oklch, #347A45 60%, white)","color-mix(in oklch, #347A45 40%, white)","color-mix(in oklch, #347A45 20%, white)"] },
+      "paper-trail-warning": { "role": "secondary", "displayName": "Paper Trail Warning", "canonical": "#855700", "tonalRamp": ["color-mix(in oklch, #855700 35%, black)","color-mix(in oklch, #855700 55%, black)","color-mix(in oklch, #855700 75%, black)","#855700","color-mix(in oklch, #855700 80%, white)","color-mix(in oklch, #855700 60%, white)","color-mix(in oklch, #855700 40%, white)","color-mix(in oklch, #855700 20%, white)"] },
+      "paper-trail-failure": { "role": "secondary", "displayName": "Paper Trail Failure", "canonical": "#B23A3A", "tonalRamp": ["color-mix(in oklch, #B23A3A 35%, black)","color-mix(in oklch, #B23A3A 55%, black)","color-mix(in oklch, #B23A3A 75%, black)","#B23A3A","color-mix(in oklch, #B23A3A 80%, white)","color-mix(in oklch, #B23A3A 60%, white)","color-mix(in oklch, #B23A3A 40%, white)","color-mix(in oklch, #B23A3A 20%, white)"] },
+      "paper-trail-muted": { "role": "neutral", "displayName": "Paper Trail Muted", "canonical": "#5F6462", "tonalRamp": ["color-mix(in oklch, #5F6462 35%, black)","color-mix(in oklch, #5F6462 55%, black)","color-mix(in oklch, #5F6462 75%, black)","#5F6462","color-mix(in oklch, #5F6462 80%, white)","color-mix(in oklch, #5F6462 60%, white)","color-mix(in oklch, #5F6462 40%, white)","color-mix(in oklch, #5F6462 20%, white)"] },
+      "high-contrast-background": { "role": "neutral", "displayName": "High Contrast Canvas", "canonical": "#000000", "tonalRamp": ["color-mix(in oklch, #000000 35%, black)","color-mix(in oklch, #000000 55%, black)","color-mix(in oklch, #000000 75%, black)","#000000","color-mix(in oklch, #000000 80%, white)","color-mix(in oklch, #000000 60%, white)","color-mix(in oklch, #000000 40%, white)","color-mix(in oklch, #000000 20%, white)"] },
+      "high-contrast-text": { "role": "neutral", "displayName": "High Contrast Text", "canonical": "#FFFFFF", "tonalRamp": ["color-mix(in oklch, #FFFFFF 35%, black)","color-mix(in oklch, #FFFFFF 55%, black)","color-mix(in oklch, #FFFFFF 75%, black)","#FFFFFF","color-mix(in oklch, #FFFFFF 80%, white)","color-mix(in oklch, #FFFFFF 60%, white)","color-mix(in oklch, #FFFFFF 40%, white)","color-mix(in oklch, #FFFFFF 20%, white)"] },
+      "high-contrast-accent": { "role": "primary", "displayName": "High Contrast Accent", "canonical": "#00DCFF", "tonalRamp": ["color-mix(in oklch, #00DCFF 35%, black)","color-mix(in oklch, #00DCFF 55%, black)","color-mix(in oklch, #00DCFF 75%, black)","#00DCFF","color-mix(in oklch, #00DCFF 80%, white)","color-mix(in oklch, #00DCFF 60%, white)","color-mix(in oklch, #00DCFF 40%, white)","color-mix(in oklch, #00DCFF 20%, white)"] },
+      "high-contrast-success": { "role": "secondary", "displayName": "High Contrast Success", "canonical": "#50FF64", "tonalRamp": ["color-mix(in oklch, #50FF64 35%, black)","color-mix(in oklch, #50FF64 55%, black)","color-mix(in oklch, #50FF64 75%, black)","#50FF64","color-mix(in oklch, #50FF64 80%, white)","color-mix(in oklch, #50FF64 60%, white)","color-mix(in oklch, #50FF64 40%, white)","color-mix(in oklch, #50FF64 20%, white)"] },
+      "high-contrast-warning": { "role": "secondary", "displayName": "High Contrast Warning", "canonical": "#FFE600", "tonalRamp": ["color-mix(in oklch, #FFE600 35%, black)","color-mix(in oklch, #FFE600 55%, black)","color-mix(in oklch, #FFE600 75%, black)","#FFE600","color-mix(in oklch, #FFE600 80%, white)","color-mix(in oklch, #FFE600 60%, white)","color-mix(in oklch, #FFE600 40%, white)","color-mix(in oklch, #FFE600 20%, white)"] },
+      "high-contrast-failure": { "role": "secondary", "displayName": "High Contrast Failure", "canonical": "#FF4646", "tonalRamp": ["color-mix(in oklch, #FF4646 35%, black)","color-mix(in oklch, #FF4646 55%, black)","color-mix(in oklch, #FF4646 75%, black)","#FF4646","color-mix(in oklch, #FF4646 80%, white)","color-mix(in oklch, #FF4646 60%, white)","color-mix(in oklch, #FF4646 40%, white)","color-mix(in oklch, #FF4646 20%, white)"] },
+      "high-contrast-muted": { "role": "neutral", "displayName": "High Contrast Muted", "canonical": "#BEBEBE", "tonalRamp": ["color-mix(in oklch, #BEBEBE 35%, black)","color-mix(in oklch, #BEBEBE 55%, black)","color-mix(in oklch, #BEBEBE 75%, black)","#BEBEBE","color-mix(in oklch, #BEBEBE 80%, white)","color-mix(in oklch, #BEBEBE 60%, white)","color-mix(in oklch, #BEBEBE 40%, white)","color-mix(in oklch, #BEBEBE 20%, white)"] }
+    },
+    "typographyMeta": {
+      "body": { "displayName": "Terminal Body", "purpose": "All event content, paths, commands, previews, and assistant text on the inherited terminal grid." },
+      "label": { "displayName": "Terminal Label", "purpose": "Bold identity, actor, state, section, tool, and composer labels at the same terminal size." }
+    },
+    "shadows": [],
+    "motion": [],
+    "breakpoints": [
+      { "name": "minimum-terminal", "value": "48 columns" },
+      { "name": "default-terminal", "value": "88 columns" },
+      { "name": "maximum-terminal", "value": "120 columns" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Status Rail",
+      "kind": "nav",
+      "refersTo": "ledger-row",
+      "description": "Terminal identity, session, model, theme, repository context, and commands above the ledger.",
+      "html": "<div class=\"ds-status-rail\"><div><strong>KITE</strong><span> | session </span>ses_01JZ<span> | model </span>gpt-5<span> | theme </span>night-flight</div><div class=\"ds-status-muted\">repo /work/kite</div><div class=\"ds-status-rule\">----------------------------------------------------------------------------------------</div><div class=\"ds-status-muted\">/help commands  /theme palette  /context inspect  /quit retain session</div></div>",
+      "css": ".ds-status-rail { width: 88ch; max-width: 100%; overflow: hidden; background: #07111F; color: #D8E2F0; font: 400 1em/1 monospace; white-space: nowrap; border-radius: 0; } .ds-status-rail strong { font-weight: 700; } .ds-status-muted { color: #8290A4; } .ds-status-rule { color: #D8E2F0; overflow: hidden; }"
+    },
+    {
+      "name": "Event Ledger Row",
+      "kind": "custom",
+      "refersTo": "ledger-row",
+      "description": "A durable event in a zero-padded sequence gutter with a literal state marker.",
+      "html": "<div class=\"ds-event-row\"><span class=\"ds-event-seq\">0042 </span><strong class=\"ds-event-state\">[run]</strong> TURN 03</div>",
+      "css": ".ds-event-row { width: 88ch; max-width: 100%; overflow: hidden; background: #07111F; color: #D8E2F0; font: 400 1em/1 monospace; white-space: nowrap; border-radius: 0; } .ds-event-seq { color: #D8E2F0; } .ds-event-state { color: #F2B94B; font-weight: 700; }"
+    },
+    {
+      "name": "Tool Hunk",
+      "kind": "custom",
+      "refersTo": "state-accent",
+      "description": "A tool start and bounded input preview rendered as a source-control-style hunk.",
+      "html": "<div class=\"ds-tool-hunk\"><div><span>0043 </span><strong>+ TOOL</strong> edit</div><div class=\"ds-tool-preview\">     | input {\"path\":\"internal/tui/app.go\"}</div><div><span>0044 </span><strong class=\"ds-tool-ok\">[ok]</strong> TOOL edit</div><div class=\"ds-tool-preview\">     | updated file</div></div>",
+      "css": ".ds-tool-hunk { width: 88ch; max-width: 100%; overflow: hidden; background: #07111F; color: #D8E2F0; font: 400 1em/1 monospace; white-space: nowrap; border-radius: 0; } .ds-tool-hunk strong { color: #6EA8FF; font-weight: 700; } .ds-tool-hunk .ds-tool-ok { color: #64D49B; } .ds-tool-preview { color: #8290A4; }"
+    },
+    {
+      "name": "Result Seal",
+      "kind": "custom",
+      "refersTo": "state-success",
+      "description": "The closing rule and compact completion, changed-file, verification, and usage summary.",
+      "html": "<div class=\"ds-result-seal\"><div><strong> RESULT </strong>--------------------------------------------------------------------------------</div><div>0048 <strong class=\"ds-result-ok\">[ok]</strong> completed</div><div class=\"ds-result-detail\">     | changed internal/tui/app.go</div><div class=\"ds-result-detail\">     | verification passed</div><div class=\"ds-result-detail\">     | usage 1240 tokens</div></div>",
+      "css": ".ds-result-seal { width: 88ch; max-width: 100%; overflow: hidden; background: #07111F; color: #D8E2F0; font: 400 1em/1 monospace; white-space: nowrap; border-radius: 0; } .ds-result-seal strong { font-weight: 700; } .ds-result-ok { color: #64D49B; } .ds-result-detail { color: #8290A4; }"
+    },
+    {
+      "name": "Composer",
+      "kind": "input",
+      "refersTo": "composer",
+      "description": "The inline buffered prompt returned after the latest durable event.",
+      "html": "<div class=\"ds-composer\"><strong>&gt; Ask Kite</strong><span class=\"ds-composer-caret\"> _</span></div>",
+      "css": ".ds-composer { width: 88ch; max-width: 100%; margin-top: 1lh; overflow: hidden; background: #07111F; color: #D8E2F0; font: 400 1em/1 monospace; white-space: nowrap; border: 0; border-radius: 0; } .ds-composer strong { color: #6EA8FF; font-weight: 700; } .ds-composer:focus-within strong { color: #6EA8FF; } .ds-composer-caret { color: #D8E2F0; }"
+    },
+    {
+      "name": "Plain Fallback",
+      "kind": "custom",
+      "refersTo": "ledger-row",
+      "description": "The same ledger grammar without ANSI color or bold styling.",
+      "html": "<pre class=\"ds-plain-ledger\">0042 [run] TURN 03\n0043 + TOOL edit\n     | input internal/tui/app.go\n0044 [ok] TOOL edit\n\n&gt; Ask Kite </pre>",
+      "css": ".ds-plain-ledger { width: 88ch; max-width: 100%; margin: 0; overflow: hidden; background: transparent; color: currentColor; font: 400 1em/1 monospace; white-space: pre; border: 0; border-radius: 0; box-shadow: none; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Durable Hunk Ledger",
+    "overview": "Kite presents one chronological record, shaped like source-control output rather than a dashboard. Durable event order is the navigation: prompts, turns, tool calls, artifacts, verification, results, and resumptions remain in one scan path. The interface is concise, capable, transparent, and calm under failure.\n\nThe system is terminal-native and information-dense. A single monospace size, sequence gutters, one-cell indentation, square geometry, and horizontal rules create hierarchy without ornamental containers. Color reinforces meaning but never owns it; every state remains legible through a literal marker or label.",
+    "keyCharacteristics": [
+      "One append-only chronological ledger rather than unrelated panels.",
+      "Source-control hunk grammar for tool input, output, and result summaries.",
+      "Three complete palettes with invariant textual state markers.",
+      "Strict monospace typography at the terminal's configured size.",
+      "Useful ANSI-free output with the same content order and labels."
+    ],
+    "rules": [
+      { "name": "The Marker Before Color Rule", "body": "State must remain explicit in `[ok]`, `[fail]`, `[run]`, `[stop]`, `[stale]`, `[resume]`, `[file]`, or equivalent text before palette color is applied.", "section": "colors" },
+      { "name": "The Complete Palette Rule", "body": "A theme switch replaces background, text, accent, success, warning, failure, and muted roles together; never recolor a single state in isolation.", "section": "colors" },
+      { "name": "The One-Grid Rule", "body": "Do not introduce a second font, proportional text, enlarged display type, or arbitrary tracking; hierarchy comes from weight, labels, rules, and spacing.", "section": "typography" },
+      { "name": "The Ledger Order Rule", "body": "Never split durable events into cards, tabs, or competing columns. Sequence and proximity carry the operational story.", "section": "layout" },
+      { "name": "The Bounded Preview Rule", "body": "Keep the ledger scannable by truncating previews and pointing to the artifact or session for complete content.", "section": "layout" },
+      { "name": "The Flat Ledger Rule", "body": "A terminal row never becomes a floating surface; hierarchy remains structural and typographic.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do preserve one chronological ledger with four-digit sequence gutters and explicit state labels.",
+      "Do use the active theme's complete seven-role palette and keep every state understandable without color.",
+      "Do retain one-cell indentation, square rules, bounded previews, and terminal-owned monospace typography.",
+      "Do sanitize untrusted content before it reaches ANSI rendering and preserve structural newlines.",
+      "Do keep theme changes non-destructive so earlier ledger rows remain available as navigation."
+    ],
+    "donts": [
+      "Don't turn events, tools, or results into unrelated cards, dashboard columns, tabs, pills, or rounded web controls.",
+      "Don't use color, icons, or animation as the only indication of running, success, warning, failure, interruption, or staleness.",
+      "Don't add shadows, elevation, gradients, ornamental borders, or a second typography scale.",
+      "Don't print unbounded tool output into the live ledger when durable artifact or session inspection is available.",
+      "Don't let model or tool content emit terminal controls or bidirectional overrides."
+    ]
+  }
+}
